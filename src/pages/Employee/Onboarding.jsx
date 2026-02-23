@@ -957,27 +957,6 @@ const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, o
         </div>
         
         <div className="flex items-center space-x-2">
-          {/* Request Documents button - always visible */}
-          <button
-            onClick={() => onRequestDocuments(item._id)}
-            className="px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors text-sm flex items-center space-x-1"
-            title="Send document upload link to candidate"
-          >
-            <FileText size={14} />
-            <span>Request Documents</span>
-          </button>
-          
-          {/* Show Send Offer button only if approval is granted */}
-          {item.status === 'preboarding' && isApprovalGranted && canEdit && (
-            <button
-              onClick={() => onOpenSendOfferModal(item)}
-              className="btn-primary text-sm flex items-center space-x-1"
-            >
-              <Mail size={14} />
-              <span>Send Offer</span>
-            </button>
-          )}
-          
           {nextActions.slice(0, 2).map((action, idx) => (
             <button
               key={idx}
