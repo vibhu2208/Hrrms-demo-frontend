@@ -66,8 +66,6 @@ import SPCProtectedRoute from './components/SPC/SPCProtectedRoute';
 
 // Manager Pages
 import ManagerHome from './pages/ManagerDashboard/SPCManagerHome';
-import ManagerLeaveApprovals from './pages/ManagerDashboard/LeaveApprovals';
-import ManagerAssignProject from './pages/ManagerDashboard/AssignProject';
 import ManagerScheduleMeeting from './pages/ManagerDashboard/ScheduleMeeting';
 import ManagerAnnouncements from './pages/ManagerDashboard/Announcements';
 import ManagerTeamReports from './pages/ManagerDashboard/TeamReports';
@@ -178,8 +176,6 @@ function App() {
             }
           >
             <Route path="dashboard" element={<ManagerHome />} />
-            <Route path="leave-approvals" element={<ManagerLeaveApprovals />} />
-            <Route path="assign-project" element={<ManagerAssignProject />} />
             <Route path="schedule-meeting" element={<ManagerScheduleMeeting />} />
             <Route path="announcements" element={<ManagerAnnouncements />} />
             <Route path="team-reports" element={<ManagerTeamReports />} />

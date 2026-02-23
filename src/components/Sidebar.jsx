@@ -169,18 +169,6 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       path: '/manager/spc/projects'
     },
     {
-      key: 'leave-approvals',
-      label: 'Leave Approvals',
-      icon: ShieldCheck,
-      path: '/manager/leave-approvals'
-    },
-    {
-      key: 'assign-project',
-      label: 'Assign Project',
-      icon: Briefcase,
-      path: '/manager/assign-project'
-    },
-    {
       key: 'schedule-meeting',
       label: 'Schedule Meeting',
       icon: Users,

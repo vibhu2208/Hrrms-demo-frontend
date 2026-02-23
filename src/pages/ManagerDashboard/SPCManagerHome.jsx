@@ -108,12 +108,18 @@ const SPCManagerHome = () => {
         setProjects(response.data.data);
       } else {
         console.log('❌ Projects failed:', response.data.message);
-        toast.error(response.data.message || 'Failed to load projects');
+        // Only show toast if it's a genuine API failure, not just empty results
+        if (response.data.message && !response.data.message.includes('No projects found')) {
+          toast.error(response.data.message);
+        }
       }
     } catch (error) {
       console.error('❌ Error fetching projects:', error);
       console.error('❌ Error details:', error.response?.data || error.message);
-      toast.error('Failed to load projects');
+      // Only show toast for network errors, not if we already have cached data
+      if (!projects.current || projects.current.length === 0) {
+        toast.error('Failed to load projects');
+      }
     }
   };
 
@@ -149,16 +155,22 @@ const SPCManagerHome = () => {
     const fetchData = async () => {
       console.log('🔍 SPCManagerHome - Starting data fetch...');
       try {
-        // Fetch team stats
+        // Fetch team stats separately to avoid blocking projects
         console.log('📊 Fetching team stats...');
-        const statsResponse = await api.get('/manager/team-stats');
-        console.log('📊 Team stats response:', statsResponse.data);
-        
-        if (statsResponse.data.success) {
-          console.log('✅ Team stats set:', statsResponse.data.data);
-          setTeamStats(statsResponse.data.data);
-        } else {
-          console.log('❌ Team stats failed:', statsResponse.data.message);
+        try {
+          const statsResponse = await api.get('/manager/team-stats');
+          console.log('📊 Team stats response:', statsResponse.data);
+          
+          if (statsResponse.data.success) {
+            console.log('✅ Team stats set:', statsResponse.data.data);
+            setTeamStats(statsResponse.data.data);
+          } else {
+            console.log('❌ Team stats failed:', statsResponse.data.message);
+            // Don't show toast for team stats failure to avoid confusion
+          }
+        } catch (statsError) {
+          console.warn('⚠️ Team stats fetch failed (non-critical):', statsError);
+          // Don't show toast for team stats failure to avoid confusion
         }
 
         console.log('📊 Fetching projects...');
@@ -167,8 +179,12 @@ const SPCManagerHome = () => {
         console.log('✅ Data fetch completed, setting loading to false');
         setLoading(false);
       } catch (error) {
-        console.error('❌ Error fetching data:', error);
+        console.error('❌ Critical error in data fetch:', error);
         console.error('❌ Error details:', error.response?.data || error.message);
+        // Only show toast if it's a critical error that affects the entire dashboard
+        if (!error.message?.includes('team stats')) {
+          toast.error('Failed to load dashboard data');
+        }
         setLoading(false);
       }
     };
@@ -178,6 +194,7 @@ const SPCManagerHome = () => {
 
   const handleViewProject = async (project) => {
     if (!project?._id) {
+      console.warn('Missing project information for project:', project);
       toast.error('Missing project information');
       return;
     }
@@ -230,27 +247,6 @@ const SPCManagerHome = () => {
 
         {/* SPC Manager Quick Actions */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button
-            onClick={() => navigate('/manager/leave-approvals')}
-            className="bg-gradient-to-br from-[#A88BFF] to-[#8B6FE8] text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all"
-          >
-            <CheckCircle className="w-6 h-6 mx-auto mb-2" />
-            <span className="text-sm font-semibold">Leave Approvals</span>
-            {teamStats.pendingApprovals > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {teamStats.pendingApprovals}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => navigate('/manager/assign-project')}
-            className="bg-[#2A2A3A] text-white p-4 rounded-2xl border border-gray-700 hover:border-[#A88BFF] transition-all"
-          >
-            <Briefcase className="w-6 h-6 text-[#A88BFF] mx-auto mb-2" />
-            <span className="text-sm font-semibold">Assign Project</span>
-          </button>
-
           <button
             onClick={() => navigate('/manager/schedule-meeting')}
             className="bg-[#2A2A3A] text-white p-4 rounded-2xl border border-gray-700 hover:border-[#A88BFF] transition-all"
@@ -305,16 +301,7 @@ const SPCManagerHome = () => {
 
         {/* SPC Assigned Projects */}
         <div className="bg-[#2A2A3A] rounded-2xl p-6 border border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white text-lg font-semibold">SPC Assigned Projects</h3>
-            <button
-              onClick={() => navigate('/manager/assign-project')}
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#A88BFF] to-[#8B6FE8] text-white rounded-xl hover:shadow-lg transition-all text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Assign Project</span>
-            </button>
-          </div>
+          <h3 className="text-white text-lg font-semibold mb-4">SPC Assigned Projects</h3>
 
           {projects.current && projects.current.length > 0 ? (
             <div className="space-y-3">
