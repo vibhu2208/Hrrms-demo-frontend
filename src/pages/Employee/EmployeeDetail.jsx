@@ -14,10 +14,43 @@ const EmployeeDetail = () => {
     fetchEmployee();
   }, [id]);
 
+  // Helper function to safely format salary values
+  const formatSalary = (value, currency = 'USD') => {
+    if (value === null || value === undefined || value === '') {
+      return `${currency} 0`;
+    }
+    
+    // Handle encrypted/hashed looking strings
+    if (typeof value === 'string') {
+      // Check if it looks like an encrypted hash (long string with special chars)
+      if (value.length > 50 && /[:\/]/.test(value)) {
+        console.warn('Detected potentially encrypted salary value:', value);
+        return `${currency} 0`;
+      }
+      
+      // Try to parse as number
+      const numValue = parseFloat(value);
+      if (isNaN(numValue)) {
+        return `${currency} 0`;
+      }
+      value = numValue;
+    }
+    
+    // Handle numbers
+    if (typeof value === 'number') {
+      return `${currency} ${value.toLocaleString()}`;
+    }
+    
+    return `${currency} 0`;
+  };
+
   const fetchEmployee = async () => {
     try {
       const response = await api.get(`/employees/${id}`);
-      setEmployee(response.data.data);
+      const employeeData = response.data.data;
+      console.log('Employee data received:', employeeData);
+      console.log('Salary data:', employeeData.salary);
+      setEmployee(employeeData);
     } catch (error) {
       toast.error('Failed to load employee details');
       navigate('/employees');
@@ -158,18 +191,26 @@ const EmployeeDetail = () => {
           </h3>
           <div className="space-y-3">
             <div>
+              <p className="text-sm text-gray-400">Currency</p>
+              <p className="text-white font-medium">
+                {typeof employee.salary === 'object' && employee.salary !== null 
+                  ? employee.salary.currency || 'USD' 
+                  : 'USD'}
+              </p>
+            </div>
+            <div>
               <p className="text-sm text-gray-400">Basic Salary</p>
               <p className="text-white">
                 {typeof employee.salary === 'object' && employee.salary !== null 
-                  ? `$${employee.salary.basic || 0}` 
-                  : employee.salary ? `$${employee.salary}` : '$0'}
+                  ? formatSalary(employee.salary.basic, employee.salary.currency) 
+                  : formatSalary(employee.salary)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">HRA</p>
               <p className="text-white">
                 {typeof employee.salary === 'object' && employee.salary !== null 
-                  ? `$${employee.salary.hra || 0}` 
+                  ? formatSalary(employee.salary.hra, employee.salary.currency) 
                   : 'N/A'}
               </p>
             </div>
@@ -177,7 +218,15 @@ const EmployeeDetail = () => {
               <p className="text-sm text-gray-400">Allowances</p>
               <p className="text-white">
                 {typeof employee.salary === 'object' && employee.salary !== null 
-                  ? `$${employee.salary.allowances || 0}` 
+                  ? formatSalary(employee.salary.allowances, employee.salary.currency) 
+                  : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Deductions</p>
+              <p className="text-white">
+                {typeof employee.salary === 'object' && employee.salary !== null 
+                  ? formatSalary(employee.salary.deductions, employee.salary.currency) 
                   : 'N/A'}
               </p>
             </div>
@@ -185,8 +234,8 @@ const EmployeeDetail = () => {
               <p className="text-sm text-gray-400">Total Salary</p>
               <p className="text-white font-bold text-lg">
                 {typeof employee.salary === 'object' && employee.salary !== null 
-                  ? `$${employee.salary.total || 0}` 
-                  : employee.salary ? `$${employee.salary}` : '$0'}
+                  ? formatSalary(employee.salary.total, employee.salary.currency) 
+                  : formatSalary(employee.salary)}
               </p>
             </div>
           </div>
@@ -212,10 +261,16 @@ const EmployeeDetail = () => {
               <p className="text-white capitalize">{employee.gender || 'N/A'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-400">Employment Type</p>
-              <p className="text-white capitalize">
-                {employee.employmentType?.replace(/-/g, ' ') || 'Full Time'}
-              </p>
+              <p className="text-sm text-gray-400">Blood Group</p>
+              <p className="text-white">{employee.bloodGroup || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Marital Status</p>
+              <p className="text-white capitalize">{employee.maritalStatus || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Alternate Phone</p>
+              <p className="text-white">{employee.alternatePhone || 'N/A'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-400">Address</p>
@@ -230,6 +285,56 @@ const EmployeeDetail = () => {
                 ) : (
                   employee.address || 'N/A'
                 )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Details */}
+        <div className="bg-[#2A2A3A] rounded-xl border border-gray-800 p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+            <DollarSign size={20} />
+            <span>Bank Details</span>
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm text-gray-400">Account Number</p>
+              <p className="text-white">
+                {typeof employee.bankDetails === 'object' && employee.bankDetails !== null 
+                  ? (employee.bankDetails.accountNumber || 'N/A')
+                  : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Bank Name</p>
+              <p className="text-white">
+                {typeof employee.bankDetails === 'object' && employee.bankDetails !== null 
+                  ? (employee.bankDetails.bankName || 'N/A')
+                  : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">IFSC Code</p>
+              <p className="text-white">
+                {typeof employee.bankDetails === 'object' && employee.bankDetails !== null 
+                  ? (employee.bankDetails.ifscCode || 'N/A')
+                  : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Account Holder Name</p>
+              <p className="text-white">
+                {typeof employee.bankDetails === 'object' && employee.bankDetails !== null 
+                  ? (employee.bankDetails.accountHolderName || 'N/A')
+                  : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Branch</p>
+              <p className="text-white">
+                {typeof employee.bankDetails === 'object' && employee.bankDetails !== null 
+                  ? (employee.bankDetails.branch || 'N/A')
+                  : 'N/A'}
               </p>
             </div>
           </div>

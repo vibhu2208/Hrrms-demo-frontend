@@ -32,7 +32,11 @@ const EmployeeList = () => {
         toast.success('Employee deleted successfully');
         fetchEmployees();
       } catch (error) {
-        toast.error('Failed to delete employee');
+        if (error.response?.status === 403) {
+          toast.error('HR users are not authorized to delete employees. Please contact an admin for this action.');
+        } else {
+          toast.error('Failed to delete employee');
+        }
       }
     }
   };
