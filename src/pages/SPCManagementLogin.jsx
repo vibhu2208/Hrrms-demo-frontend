@@ -82,7 +82,26 @@ const SPCManagementLogin = () => {
         navigate('/dashboard');
       }
     } else {
-      toast.error(result.message || 'Invalid credentials');
+      // Handle specific error scenarios with detailed messages
+      const errorMessage = result.message?.toLowerCase() || '';
+      
+      if (errorMessage.includes('invalid credentials') || errorMessage.includes('password')) {
+        toast.error('Invalid email or password. Please check your credentials and try again.');
+      } else if (errorMessage.includes('not found in')) {
+        toast.error('User not found in SPC Management. Please select the correct company or contact your administrator.');
+      } else if (errorMessage.includes('not found') && !errorMessage.includes('company')) {
+        toast.error('No account found with this email address. Please contact your administrator.');
+      } else if (errorMessage.includes('deactivated') || errorMessage.includes('inactive')) {
+        toast.error('Your account has been deactivated. Please contact your administrator.');
+      } else if (errorMessage.includes('company not found') || errorMessage.includes('inactive')) {
+        toast.error('SPC Management company not found or inactive. Please contact support.');
+      } else if (errorMessage.includes('database') || errorMessage.includes('accessing company')) {
+        toast.error('Error accessing SPC Management database. Please try again or contact support.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+        toast.error('Network error. Please check your internet connection and try again.');
+      } else {
+        toast.error(result.message || 'Login failed. Please try again.');
+      }
     }
 
     setLoading(false);

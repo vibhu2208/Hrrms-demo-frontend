@@ -40,7 +40,20 @@ const SuperAdminLogin = () => {
         localStorage.removeItem('user');
       }
     } else {
-      toast.error(result.message || 'Invalid credentials');
+      // Handle specific error scenarios with detailed messages
+      const errorMessage = result.message?.toLowerCase() || '';
+      
+      if (errorMessage.includes('invalid credentials') || errorMessage.includes('password')) {
+        toast.error('Invalid Super Admin email or password. Please check your credentials and try again.');
+      } else if (errorMessage.includes('not found')) {
+        toast.error('No Super Admin account found with this email address.');
+      } else if (errorMessage.includes('deactivated') || errorMessage.includes('inactive')) {
+        toast.error('Your Super Admin account has been deactivated. Please contact system administrator.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+        toast.error('Network error. Please check your internet connection and try again.');
+      } else {
+        toast.error(result.message || 'Super Admin login failed. Please try again.');
+      }
     }
 
     setLoading(false);

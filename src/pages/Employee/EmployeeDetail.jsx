@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Briefcase, DollarSign } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Briefcase, DollarSign, Edit, User } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
@@ -39,19 +39,26 @@ const EmployeeDetail = () => {
   return (
     <div className="min-h-screen bg-[#1E1E2A] space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <button
           onClick={() => navigate('/employees')}
           className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             Employee Details
           </h1>
           <p className="text-gray-400 mt-1">{employee.employeeCode}</p>
         </div>
+        <button
+          onClick={() => navigate(`/employees/${id}/edit`)}
+          className="px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20 flex items-center space-x-2"
+        >
+          <Edit size={16} />
+          <span>Edit Employee</span>
+        </button>
       </div>
 
       {/* Profile Card */}
@@ -129,7 +136,7 @@ const EmployeeDetail = () => {
             <div>
               <p className="text-sm text-gray-400">Joining Date</p>
               <p className="text-white">
-                {new Date(employee.joiningDate).toLocaleDateString()}
+                {employee.joiningDate ? new Date(employee.joiningDate).toLocaleDateString() : 'N/A'}
               </p>
             </div>
             <div>
@@ -152,19 +159,35 @@ const EmployeeDetail = () => {
           <div className="space-y-3">
             <div>
               <p className="text-sm text-gray-400">Basic Salary</p>
-              <p className="text-white">${employee.salary?.basic || 0}</p>
+              <p className="text-white">
+                {typeof employee.salary === 'object' && employee.salary !== null 
+                  ? `$${employee.salary.basic || 0}` 
+                  : employee.salary ? `$${employee.salary}` : '$0'}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">HRA</p>
-              <p className="text-white">${employee.salary?.hra || 0}</p>
+              <p className="text-white">
+                {typeof employee.salary === 'object' && employee.salary !== null 
+                  ? `$${employee.salary.hra || 0}` 
+                  : 'N/A'}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">Allowances</p>
-              <p className="text-white">${employee.salary?.allowances || 0}</p>
+              <p className="text-white">
+                {typeof employee.salary === 'object' && employee.salary !== null 
+                  ? `$${employee.salary.allowances || 0}` 
+                  : 'N/A'}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">Total Salary</p>
-              <p className="text-white font-bold text-lg">${employee.salary?.total || 0}</p>
+              <p className="text-white font-bold text-lg">
+                {typeof employee.salary === 'object' && employee.salary !== null 
+                  ? `$${employee.salary.total || 0}` 
+                  : employee.salary ? `$${employee.salary}` : '$0'}
+              </p>
             </div>
           </div>
         </div>
@@ -189,12 +212,24 @@ const EmployeeDetail = () => {
               <p className="text-white capitalize">{employee.gender || 'N/A'}</p>
             </div>
             <div>
+              <p className="text-sm text-gray-400">Employment Type</p>
+              <p className="text-white capitalize">
+                {employee.employmentType?.replace(/-/g, ' ') || 'Full Time'}
+              </p>
+            </div>
+            <div>
               <p className="text-sm text-gray-400">Address</p>
               <p className="text-white">
-                {employee.address?.street && `${employee.address.street}, `}
-                {employee.address?.city && `${employee.address.city}, `}
-                {employee.address?.state && `${employee.address.state} `}
-                {employee.address?.zipCode}
+                {typeof employee.address === 'object' && employee.address !== null ? (
+                  [
+                    employee.address.street,
+                    employee.address.city,
+                    employee.address.state,
+                    employee.address.zipCode
+                  ].filter(Boolean).join(', ') || 'N/A'
+                ) : (
+                  employee.address || 'N/A'
+                )}
               </p>
             </div>
           </div>
@@ -203,21 +238,33 @@ const EmployeeDetail = () => {
         {/* Emergency Contact */}
         <div className="bg-[#2A2A3A] rounded-xl border border-gray-800 p-6 shadow-xl">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
-            <Phone size={20} />
+            <User size={20} />
             <span>Emergency Contact</span>
           </h3>
           <div className="space-y-3">
             <div>
               <p className="text-sm text-gray-400">Name</p>
-              <p className="text-white">{employee.emergencyContact?.name || 'N/A'}</p>
+              <p className="text-white">
+                {typeof employee.emergencyContact === 'object' && employee.emergencyContact !== null 
+                  ? (employee.emergencyContact.name || 'N/A')
+                  : 'N/A'}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">Relationship</p>
-              <p className="text-white">{employee.emergencyContact?.relationship || 'N/A'}</p>
+              <p className="text-white">
+                {typeof employee.emergencyContact === 'object' && employee.emergencyContact !== null 
+                  ? (employee.emergencyContact.relationship || 'N/A')
+                  : 'N/A'}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-400">Phone</p>
-              <p className="text-white">{employee.emergencyContact?.phone || 'N/A'}</p>
+              <p className="text-white">
+                {typeof employee.emergencyContact === 'object' && employee.emergencyContact !== null 
+                  ? (employee.emergencyContact.phone || 'N/A')
+                  : (typeof employee.emergencyContact === 'string' ? employee.emergencyContact : 'N/A')}
+              </p>
             </div>
           </div>
         </div>

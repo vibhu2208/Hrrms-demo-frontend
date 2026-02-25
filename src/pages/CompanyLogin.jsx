@@ -82,7 +82,7 @@ const CompanyLogin = () => {
     e.preventDefault();
     setLoading(true);
 
-    console.log('🔐 Login attempt:', {
+    console.log('🔐 CompanyLogin.jsx: Login attempt:', {
       email: formData.email,
       companyId: selectedCompany?.id,
       companyName: selectedCompany?.name
@@ -91,7 +91,7 @@ const CompanyLogin = () => {
     // Add company ID to login request for specific database authentication
     const result = await login(formData.email, formData.password, selectedCompany?.id);
 
-    console.log('📊 Login result:', result);
+    console.log('📊 CompanyLogin.jsx: Login result:', result);
 
     if (result.success) {
       toast.success('Login successful!');
@@ -109,7 +109,32 @@ const CompanyLogin = () => {
         navigate('/dashboard');
       }
     } else {
-      toast.error(result.message || 'Invalid credentials');
+      console.log('❌ CompanyLogin.jsx: Login failed, processing error message:', result.message);
+      
+      // Handle specific error scenarios with detailed messages
+      const errorMessage = result.message?.toLowerCase() || '';
+      
+      let toastMessage = '';
+      if (errorMessage.includes('invalid credentials') || errorMessage.includes('password')) {
+        toastMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (errorMessage.includes('not found in')) {
+        toastMessage = 'User not found in this company. Please select the correct company or contact your administrator.';
+      } else if (errorMessage.includes('not found') && !errorMessage.includes('company')) {
+        toastMessage = 'No account found with this email address. Please contact your administrator.';
+      } else if (errorMessage.includes('deactivated') || errorMessage.includes('inactive')) {
+        toastMessage = 'Your account has been deactivated. Please contact your administrator.';
+      } else if (errorMessage.includes('company not found') || errorMessage.includes('inactive')) {
+        toastMessage = 'Company not found or inactive. Please select a valid company.';
+      } else if (errorMessage.includes('database') || errorMessage.includes('accessing company')) {
+        toastMessage = 'Error accessing company database. Please try again or contact support.';
+      } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+        toastMessage = 'Network error. Please check your internet connection and try again.';
+      } else {
+        toastMessage = result.message || 'Login failed. Please try again.';
+      }
+      
+      console.log('🍞 CompanyLogin.jsx: Showing toast message:', toastMessage);
+      toast.error(toastMessage);
     }
 
     setLoading(false);
@@ -131,7 +156,20 @@ const CompanyLogin = () => {
         navigate('/dashboard');
       }
     } else {
-      toast.error(result.message || 'Google login failed');
+      // Handle specific Google login error scenarios
+      const errorMessage = result.message?.toLowerCase() || '';
+      
+      if (errorMessage.includes('no account found')) {
+        toast.error('No account found with this Google email. Please contact your administrator to create an account.');
+      } else if (errorMessage.includes('deactivated') || errorMessage.includes('inactive')) {
+        toast.error('Your account has been deactivated. Please contact your administrator.');
+      } else if (errorMessage.includes('invalid google token')) {
+        toast.error('Invalid Google authentication. Please try again.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+        toast.error('Network error during Google login. Please check your internet connection and try again.');
+      } else {
+        toast.error(result.message || 'Google login failed. Please try again.');
+      }
     }
     
     setLoading(false);

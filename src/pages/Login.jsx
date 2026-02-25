@@ -26,24 +26,55 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
-    const result = await login(formData.email, formData.password);
+    console.log('🔐 Login.jsx: Starting login attempt', { email: formData.email });
+    
+    try {
+      const result = await login(formData.email, formData.password);
+      console.log('📊 Login.jsx: Login result received:', result);
 
-    if (result.success) {
-      toast.success('Login successful!');
-      
-      // Get user from localStorage to check role
-      const userData = JSON.parse(localStorage.getItem('user'));
-      
-      // Role-based redirection
-      if (userData?.role === 'superadmin') {
-        navigate('/super-admin/dashboard');
-      } else if (userData?.role === 'employee') {
-        navigate('/employee/dashboard');
+      if (result.success) {
+        toast.success('Login successful!');
+        
+        // Get user from localStorage to check role
+        const userData = JSON.parse(localStorage.getItem('user'));
+        
+        // Role-based redirection
+        if (userData?.role === 'superadmin') {
+          navigate('/super-admin/dashboard');
+        } else if (userData?.role === 'employee') {
+          navigate('/employee/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
-        navigate('/dashboard');
+        console.log('❌ Login.jsx: Login failed, processing error message:', result.message);
+        
+        // Handle specific error scenarios with detailed messages
+        const errorMessage = result.message?.toLowerCase() || '';
+        
+        let toastMessage = '';
+        if (errorMessage.includes('invalid credentials') || errorMessage.includes('password')) {
+          toastMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (errorMessage.includes('not found')) {
+          toastMessage = 'No account found with this email address. Please contact your administrator.';
+        } else if (errorMessage.includes('deactivated') || errorMessage.includes('inactive')) {
+          toastMessage = 'Your account has been deactivated. Please contact your administrator.';
+        } else if (errorMessage.includes('company')) {
+          toastMessage = 'Company access issue. Please select the correct company or contact admin.';
+        } else if (errorMessage.includes('database') || errorMessage.includes('server')) {
+          toastMessage = 'Server error. Please try again later or contact support.';
+        } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+          toastMessage = 'Network error. Please check your internet connection and try again.';
+        } else {
+          toastMessage = result.message || 'Login failed. Please try again.';
+        }
+        
+        console.log('🍞 Login.jsx: Showing toast message:', toastMessage);
+        toast.error(toastMessage);
       }
-    } else {
-      toast.error(result.message);
+    } catch (error) {
+      console.error('💥 Login.jsx: Unexpected error during login:', error);
+      toast.error('An unexpected error occurred. Please try again.');
     }
 
     setLoading(false);
@@ -69,7 +100,20 @@ const Login = () => {
         navigate('/dashboard');
       }
     } else {
-      toast.error(result.message);
+      // Handle specific Google login error scenarios
+      const errorMessage = result.message?.toLowerCase() || '';
+      
+      if (errorMessage.includes('no account found')) {
+        toast.error('No account found with this Google email. Please contact your administrator to create an account.');
+      } else if (errorMessage.includes('deactivated') || errorMessage.includes('inactive')) {
+        toast.error('Your account has been deactivated. Please contact your administrator.');
+      } else if (errorMessage.includes('invalid google token')) {
+        toast.error('Invalid Google authentication. Please try again.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+        toast.error('Network error during Google login. Please check your internet connection and try again.');
+      } else {
+        toast.error(result.message || 'Google login failed. Please try again.');
+      }
     }
     
     setLoading(false);
