@@ -269,6 +269,16 @@ const ProjectDashboard = ({ userRole }) => {
           <CalendarOutlined /> {record.startDate ? new Date(record.startDate).toLocaleDateString() : 'N/A'}
           <br />
           <small>to {record.endDate ? new Date(record.endDate).toLocaleDateString() : 'No end date'}</small>
+          {record.contractId && (
+            <div>
+              <small style={{ color: '#52c41a' }}>📄 From Contract</small>
+            </div>
+          )}
+          {record.jobPostingId && (
+            <div>
+              <small style={{ color: '#1890ff' }}>💼 From Job Posting</small>
+            </div>
+          )}
         </div>
       )
     },
@@ -507,6 +517,23 @@ const ProjectDashboard = ({ userRole }) => {
             label="Budget Allocation"
           >
             <Input type="number" placeholder="Enter budget amount" />
+          </Form.Item>
+
+          <Form.Item
+            name="contractId"
+            label="Link to Contract (Optional)"
+          >
+            <Select 
+              placeholder="Select contract to link (will use contract dates as timeline)"
+              allowClear
+              showSearch
+              filterOption={(input, option) =>
+                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              }
+            >
+              {/* This would be populated with available contracts */}
+              <Option value="">No contract</Option>
+            </Select>
           </Form.Item>
 
           <Form.Item>

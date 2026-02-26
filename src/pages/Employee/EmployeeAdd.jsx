@@ -129,10 +129,14 @@ const EmployeeAdd = () => {
       return;
     }
 
-    // Prepare data for backend (convert salary fields to numbers)
+    // Prepare data for backend (convert salary fields to numbers and handle enum fields)
     const submitData = {
       ...formData,
       ...(formData.employeeCode && formData.employeeCode.trim() ? { employeeCode: formData.employeeCode } : {}),
+      // Handle enum fields - only include if they have valid values
+      ...(formData.gender && formData.gender.trim() ? { gender: formData.gender } : {}),
+      ...(formData.bloodGroup && formData.bloodGroup.trim() ? { bloodGroup: formData.bloodGroup } : {}),
+      ...(formData.maritalStatus && formData.maritalStatus.trim() ? { maritalStatus: formData.maritalStatus } : {}),
       salary: {
         currency: formData.salary.currency || 'USD',
         basic: parseFloat(formData.salary.basic) || 0,
@@ -483,11 +487,13 @@ const EmployeeAdd = () => {
                 className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent transition-all"
               >
                 <option value="full-time">Full Time</option>
-                <option value="contract-fixed-deliverable">Contract - Fixed Deliverable</option>
-                <option value="contract-rate-based">Contract - Rate Based</option>
-                <option value="contract-hourly-based">Contract - Hourly Based</option>
-                <option value="contract">Contract</option>
+                <option value="part-time">Part Time</option>
+                <option value="consultant">Consultant</option>
                 <option value="intern">Intern</option>
+                <option value="contract-based">Contract Based</option>
+                <option value="deliverable-based">Deliverable Based</option>
+                <option value="rate-based">Rate Based</option>
+                <option value="hourly-based">Hourly Based</option>
               </select>
             </div>
           </div>

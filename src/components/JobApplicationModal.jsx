@@ -29,6 +29,7 @@ const JobApplicationModal = ({ job, onClose, onSubmit }) => {
     },
     currentLocation: '',
     preferredLocation: [],
+    employmentType: 'full-time',
     // Emergency Contact
     emergencyContact: {
       name: '',
@@ -112,7 +113,8 @@ const JobApplicationModal = ({ job, onClose, onSubmit }) => {
               name: '',
               relationship: '',
               phone: ''
-            }
+            },
+            employmentType: employee.employmentType || 'full-time'
           }));
         } catch (error) {
           console.error('Failed to fetch employee data:', error);
@@ -345,13 +347,21 @@ const JobApplicationModal = ({ job, onClose, onSubmit }) => {
       formDataToSubmit.append('phone', formData.phone);
       formDataToSubmit.append('alternatePhone', formData.alternatePhone || '');
       formDataToSubmit.append('dateOfBirth', formData.dateOfBirth || '');
-      formDataToSubmit.append('gender', formData.gender || '');
-      formDataToSubmit.append('bloodGroup', formData.bloodGroup || '');
-      formDataToSubmit.append('maritalStatus', formData.maritalStatus || '');
+      // Only append enum fields if they have valid values
+      if (formData.gender && formData.gender.trim()) {
+        formDataToSubmit.append('gender', formData.gender);
+      }
+      if (formData.bloodGroup && formData.bloodGroup.trim()) {
+        formDataToSubmit.append('bloodGroup', formData.bloodGroup);
+      }
+      if (formData.maritalStatus && formData.maritalStatus.trim()) {
+        formDataToSubmit.append('maritalStatus', formData.maritalStatus);
+      }
       formDataToSubmit.append('address', JSON.stringify(formData.address));
       formDataToSubmit.append('emergencyContact', JSON.stringify(formData.emergencyContact));
       formDataToSubmit.append('currentLocation', formData.currentLocation || '');
       formDataToSubmit.append('preferredLocation', JSON.stringify(formData.preferredLocation));
+      formDataToSubmit.append('employmentType', formData.employmentType || 'full-time');
       
       // Experience
       formDataToSubmit.append('experience[years]', parseInt(formData.experience.years) || 0);
@@ -566,6 +576,26 @@ const JobApplicationModal = ({ job, onClose, onSubmit }) => {
                   <option value="married">Married</option>
                   <option value="divorced">Divorced</option>
                   <option value="widowed">Widowed</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Preferred Employment Type
+                </label>
+                <select
+                  name="employmentType"
+                  value={formData.employmentType}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 bg-dark-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="full-time">Full Time</option>
+                  <option value="part-time">Part Time</option>
+                  <option value="consultant">Consultant</option>
+                  <option value="intern">Intern</option>
+                  <option value="contract-based">Contract Based</option>
+                  <option value="deliverable-based">Deliverable Based</option>
+                  <option value="rate-based">Rate Based</option>
+                  <option value="hourly-based">Hourly Based</option>
                 </select>
               </div>
             </div>

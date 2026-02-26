@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import { Users, Plus, FileText, UploadCloud, Search, Clock, Filter, X, Loader2, Download, CheckCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { getEmploymentTypeStyle, getEmploymentTypeLabel } from '../../utils/employmentTypeConstants';
 
 const CandidateList = () => {
   const [allEntries, setAllEntries] = useState([]);
@@ -954,16 +955,8 @@ const CandidateList = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 rounded-full text-xs font-medium capitalize
-                        ${entry.employmentType === 'full-time' ? 'bg-blue-500/10 text-blue-300 border border-blue-500/30' :
-                          entry.employmentType === 'part-time' ? 'bg-green-500/10 text-green-300 border border-green-500/30' :
-                          entry.employmentType === 'contract' ? 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/30' :
-                          entry.employmentType === 'contract-based' ? 'bg-orange-500/10 text-orange-300 border border-orange-500/30' :
-                          entry.employmentType === 'deliverable-based' ? 'bg-purple-500/10 text-purple-300 border border-purple-500/30' :
-                          entry.employmentType === 'rate-based' ? 'bg-pink-500/10 text-pink-300 border border-pink-500/30' :
-                          entry.employmentType === 'hourly-based' ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/30' :
-                          'bg-gray-500/10 text-gray-300 border border-gray-500/30'}">
-                        {entry.employmentType?.replace('-', ' ') || 'full-time'}
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getEmploymentTypeStyle(entry.employmentType)}`}>
+                        {getEmploymentTypeLabel(entry.employmentType)}
                       </span>
                     </td>
                     <td className="px-4 py-3 max-w-xs">

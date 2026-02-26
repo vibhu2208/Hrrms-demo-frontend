@@ -143,6 +143,10 @@ const EmployeeEdit = () => {
         department: formData.department || null,
         // Handle reporting manager field
         reportingManager: formData.reportingManager?.trim() || null,
+        // Handle enum fields - only include if they have valid values
+        ...(formData.gender && formData.gender.trim() ? { gender: formData.gender } : {}),
+        ...(formData.bloodGroup && formData.bloodGroup.trim() ? { bloodGroup: formData.bloodGroup } : {}),
+        ...(formData.maritalStatus && formData.maritalStatus.trim() ? { maritalStatus: formData.maritalStatus } : {}),
         // Handle nested objects - only send if they have meaningful data
         address: (formData.address.street || formData.address.city || formData.address.state || formData.address.zipCode) 
           ? formData.address 
@@ -567,8 +571,12 @@ const EmployeeEdit = () => {
               >
                 <option value="full-time">Full Time</option>
                 <option value="part-time">Part Time</option>
-                <option value="contract">Contract</option>
+                <option value="consultant">Consultant</option>
                 <option value="intern">Intern</option>
+                <option value="contract-based">Contract Based</option>
+                <option value="deliverable-based">Deliverable Based</option>
+                <option value="rate-based">Rate Based</option>
+                <option value="hourly-based">Hourly Based</option>
               </select>
             </div>
             <div>

@@ -254,7 +254,7 @@ const JobDesk = () => {
               </div>
               
               {/* Employment Type Specific Information */}
-              {(job.employmentType === 'contract-based' || job.employmentType === 'contract') && (
+              {(job.employmentType === 'contract-based' || job.employmentType === 'consultant') && (
                 <div className="flex items-center text-sm text-gray-400">
                   <span className="font-medium text-gray-300 w-24">Duration:</span>
                   <span>{job.contractDuration || 'Not specified'}</span>

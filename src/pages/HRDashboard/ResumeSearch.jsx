@@ -501,9 +501,12 @@ const ResumeSearch = () => {
                 >
                   <option value="full-time">Full Time</option>
                   <option value="part-time">Part Time</option>
-                  <option value="contract">Contract</option>
-                  <option value="intern">Internship</option>
-                  <option value="freelance">Freelance</option>
+                  <option value="consultant">Consultant</option>
+                  <option value="intern">Intern</option>
+                  <option value="contract-based">Contract Based</option>
+                  <option value="deliverable-based">Deliverable Based</option>
+                  <option value="rate-based">Rate Based</option>
+                  <option value="hourly-based">Hourly Based</option>
                 </select>
               </div>
               <div>
