@@ -34,9 +34,9 @@ const getCurrentEnvironment = () => {
 const getApiBaseUrl = (env) => {
   switch (env) {
     case ENV.DEVELOPMENT:
-      // In development, use proxy path (configured in vite.config.js)
-      // This proxies to http://localhost:5001
-      return '/api';
+      // Temporarily use direct backend URL to bypass proxy issues
+      return 'http://localhost:5001/api';
+      // Original: return '/api'; // This should proxy to http://localhost:5001 via Vite
       
     case ENV.STAGING:
       // Staging environment - use env variable or staging default

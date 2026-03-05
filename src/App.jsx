@@ -19,6 +19,7 @@ import SPCManagementLogin from './pages/SPCManagementLogin';
 import CareersPage from './pages/Public/CareersPage';
 import CandidateDocuments from './pages/CandidateDocuments';
 import DocumentUpload from './pages/Public/DocumentUpload';
+import PayslipUpload from './pages/Public/PayslipUpload';
 import Unauthorized from './pages/Unauthorized';
 import DebugAuth from './components/DebugAuth';
 
@@ -115,6 +116,7 @@ function App() {
           <Route path="/jobs" element={<CareersPage />} />
           <Route path="/candidate-documents" element={<CandidateDocuments />} />
           <Route path="/public/upload-documents/:token" element={<DocumentUpload />} />
+          <Route path="/public/upload-payslip/:token" element={<PayslipUpload />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/debug" element={<DebugAuth />} />
           
