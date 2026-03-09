@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Plus, CheckCircle, Circle, Clock, User, Calendar, FileText, 
   Search, Filter, Eye, Edit, Trash2, X, MoreVertical, CheckSquare,
@@ -926,6 +926,82 @@ const InitiateOffboardingModal = ({ employees, onClose, onSubmit }) => {
     lastWorkingDay: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowEmployeeDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Filter employees based on search term
+  const filteredEmployees = employees?.filter(emp => {
+    if (!searchTerm) return true; // Show all employees if search is empty
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (emp.firstName || '').toLowerCase().includes(searchLower) ||
+      (emp.lastName || '').toLowerCase().includes(searchLower) ||
+      (emp.email || '').toLowerCase().includes(searchLower) ||
+      (emp.employeeCode || '').toLowerCase().includes(searchLower) ||
+      `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase().includes(searchLower)
+    );
+  }) || [];
+
+  const handleEmployeeSelect = (employee) => {
+    setSelectedEmployee(employee);
+    setFormData({ ...formData, employeeId: employee._id });
+    setSearchTerm(`${employee.firstName || ''} ${employee.lastName || ''} - ${employee.email || ''} (${employee.employeeCode || ''})`);
+    setShowEmployeeDropdown(false);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setShowEmployeeDropdown(true);
+    setHighlightedIndex(-1);
+    if (e.target.value === '') {
+      setSelectedEmployee(null);
+      setFormData({ ...formData, employeeId: '' });
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (!showEmployeeDropdown || filteredEmployees.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex(prev => 
+          prev < filteredEmployees.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightedIndex >= 0 && filteredEmployees[highlightedIndex]) {
+          handleEmployeeSelect(filteredEmployees[highlightedIndex]);
+        }
+        break;
+      case 'Escape':
+        setShowEmployeeDropdown(false);
+        setHighlightedIndex(-1);
+        break;
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -956,24 +1032,69 @@ const InitiateOffboardingModal = ({ employees, onClose, onSubmit }) => {
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Employee <span className="text-red-400">*</span>
             </label>
-            <select
-              value={formData.employeeId}
-              onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-              className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent transition-all cursor-pointer"
-              required
-              disabled={!employees || employees.length === 0}
-            >
-              <option value="" className="bg-[#1E1E2A] text-gray-400">Select Employee</option>
-              {employees && employees.length > 0 ? (
-                employees.map((emp) => (
-                  <option key={emp._id} value={emp._id} className="bg-[#1E1E2A] text-white">
-                    {emp.firstName || ''} {emp.lastName || ''} {emp.email ? `- ${emp.email}` : ''} {emp.employeeCode ? `(${emp.employeeCode})` : ''}
-                  </option>
-                ))
-              ) : (
-                <option value="" disabled className="bg-[#1E1E2A] text-gray-500">No employees available</option>
+            <div className="relative" ref={dropdownRef}>
+              <div className="relative">
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setShowEmployeeDropdown(true)}
+                  placeholder="Search by name, email, or employee code..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent transition-all"
+                  disabled={!employees || employees.length === 0}
+                />
+              </div>
+              
+              {/* Employee Dropdown */}
+              {showEmployeeDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-[#1E1E2A] border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((emp, index) => (
+                      <div
+                        key={emp._id}
+                        onClick={() => handleEmployeeSelect(emp)}
+                        className={`px-4 py-3 cursor-pointer transition-colors border-b border-gray-700 last:border-b-0 ${
+                          index === highlightedIndex ? 'bg-[#A88BFF] text-white' : 'hover:bg-[#2A2A3A]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-[#A88BFF] rounded-full flex items-center justify-center text-white text-sm font-medium">
+                              {(emp.firstName?.[0] || emp.email?.[0] || '?').toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="text-white font-medium">
+                                {emp.firstName || ''} {emp.lastName || ''}
+                              </div>
+                              <div className="text-gray-400 text-sm">
+                                {emp.email || ''}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-gray-400 text-sm">
+                              {emp.employeeCode || ''}
+                            </div>
+                            <div className="text-gray-500 text-xs">
+                              {emp.department?.name || emp.department || ''}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-gray-400 text-center">
+                      {searchTerm ? `No employees found matching "${searchTerm}"` : 'No employees available'}
+                    </div>
+                  )}
+                </div>
               )}
-            </select>
+            </div>
             {(!employees || employees.length === 0) && (
               <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                 <p className="text-xs text-yellow-400 flex items-center gap-1">

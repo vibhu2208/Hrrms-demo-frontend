@@ -16,11 +16,19 @@ const statusLabels = {
   'preboarding': { label: 'Pre-boarding', color: 'bg-blue-500', icon: Circle },
   'pending_approval': { label: 'Pending Approval', color: 'bg-amber-500', icon: Clock },
   'approval_rejected': { label: 'On Hold', color: 'bg-orange-600', icon: ShieldX },
+  'payslip_upload_requested': { label: 'Payslip Request Sent', color: 'bg-purple-500', icon: Mail },
+  'payslip_verification': { label: 'Payslip Verification', color: 'bg-orange-600', icon: FileText },
+  'payslip_approved': { label: 'Payslip Approved', color: 'bg-green-600', icon: CheckCircle },
+  'payslip_rejected': { label: 'Payslip Rejected', color: 'bg-red-600', icon: X },
   'offer_sent': { label: 'Offer Sent', color: 'bg-yellow-500', icon: Mail },
+  'background_verification': { label: 'Background Verification', color: 'bg-indigo-600', icon: ShieldCheck },
+  'background_verified': { label: 'Background Verified', color: 'bg-green-600', icon: CheckCircle },
+  'background_rejected': { label: 'Background Rejected', color: 'bg-red-600', icon: X },
   'offer_accepted': { label: 'Offer Accepted', color: 'bg-green-500', icon: CheckCircle },
   'docs_pending': { label: 'Documents Pending', color: 'bg-orange-500', icon: FileText },
   'docs_verified': { label: 'Documents Verified', color: 'bg-emerald-500', icon: CheckSquare },
   'ready_for_joining': { label: 'Ready for Joining', color: 'bg-purple-500', icon: Calendar },
+  'agreement_generated': { label: 'Agreement Generated', color: 'bg-blue-600', icon: FileText },
   'completed': { label: 'Completed', color: 'bg-green-600', icon: CheckCircle },
   'rejected': { label: 'Rejected', color: 'bg-red-500', icon: AlertCircle }
 };
@@ -35,8 +43,9 @@ const approvalStatusLabels = {
 
 const OnboardingProgressBar = ({ status, onSkipStage, itemId, canEdit = true }) => {
   const steps = [
-    'preboarding', 'offer_sent', 'offer_accepted', 
-    'docs_pending', 'docs_verified', 'ready_for_joining', 'completed'
+    'preboarding', 'pending_approval', 'payslip_upload_requested', 'payslip_verification', 
+    'payslip_approved', 'offer_sent', 'offer_accepted', 'background_verification', 
+    'background_verified', 'docs_pending', 'docs_verified', 'ready_for_joining', 'agreement_generated', 'completed'
   ];
   
   const currentIndex = steps.indexOf(status);
@@ -132,14 +141,65 @@ const Onboarding = () => {
   
   // Template states
   const [templates, setTemplates] = useState([]);
+  const [agreementTemplatesForManagement, setAgreementTemplatesForManagement] = useState([
+    // Add template directly to initial state as backup
+    {
+      _id: '69a59d7252e1c69cda4ec39b',
+      templateId: 'FTC-1772461426396-N4MEXTW0W',
+      name: 'Fixed Term Employment Contract - Program Officer',
+      description: 'Comprehensive fixed term employment contract for program officer positions with all terms and conditions, annexures, and legal clauses',
+      category: 'employment',
+      subject: 'Fixed Term Employment Contract for the position of {{designation}}',
+      status: 'active',
+      isDefault: false,
+      legalReviewed: true,
+      usageCount: 0,
+      variables: [
+        { key: 'employeeCode', label: 'Employee Code', type: 'text', required: true },
+        { key: 'contractDate', label: 'Contract Date', type: 'date', required: true },
+        { key: 'employeeName', label: 'Employee Full Name', type: 'text', required: true },
+        { key: 'employeeAddress', label: 'Employee Address', type: 'text', required: true },
+        { key: 'designation', label: 'Designation', type: 'text', required: true },
+        { key: 'companyName', label: 'Company Full Name', type: 'text', required: true },
+        { key: 'companyShortName', label: 'Company Short Name', type: 'text', required: true },
+        { key: 'grossSalary', label: 'Gross Salary (Rs.)', type: 'currency', required: true },
+        { key: 'grossSalaryWords', label: 'Gross Salary in Words', type: 'text', required: true },
+        { key: 'startDate', label: 'Start Date', type: 'date', required: true },
+        { key: 'endDate', label: 'End Date', type: 'date', required: true },
+        { key: 'workLocation', label: 'Work Location', type: 'text', required: true },
+        { key: 'reportingTo', label: 'Reporting To', type: 'text', required: true },
+        { key: 'noticePeriod', label: 'Notice Period', type: 'text', required: false, defaultValue: 'Thirty Days' },
+        { key: 'jurisdiction', label: 'Governing Jurisdiction', type: 'text', required: false, defaultValue: 'Delhi' },
+        { key: 'basicSalary', label: 'Basic Salary', type: 'currency', required: true },
+        { key: 'hra', label: 'HRA', type: 'currency', required: true },
+        { key: 'specialAllowance', label: 'Special Allowance', type: 'currency', required: true },
+        { key: 'telephoneAllowance', label: 'Telephone Allowance', type: 'currency', required: true },
+        { key: 'employerPF', label: 'Employer PF Contribution', type: 'currency', required: true },
+        { key: 'costToCompany', label: 'Cost to Company', type: 'currency', required: true },
+        { key: 'medicalInsuranceSum', label: 'Medical Insurance Sum Assured', type: 'text', required: false, defaultValue: '1 lakh' },
+        { key: 'accidentInsuranceSum', label: 'Accident Insurance Sum Assured', type: 'text', required: false, defaultValue: '5 Lakh' },
+        { key: 'authorizedSignatory', label: 'Authorized Signatory', type: 'text', required: true },
+        { key: 'signatoryTitle', label: 'Signatory Title', type: 'text', required: true }
+      ],
+      tags: ['fixed-term', 'program-officer', 'comprehensive', 'legal', 'contract'],
+      createdAt: new Date('2026-03-02T19:53:46.000Z'),
+      updatedAt: new Date('2026-03-02T19:53:46.000Z')
+    }
+  ]);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
-  const [templateFilter, setTemplateFilter] = useState({ status: '', category: '', search: '' });
+  const [editingTemplateType, setEditingTemplateType] = useState('offer');
+  const [templateFilter, setTemplateFilter] = useState({ status: '', category: '', search: '', type: '' });
   
   // Send Offer Modal states
   const [showSendOfferModal, setShowSendOfferModal] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+
+  // Agreement Generation Modal states
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [agreementTemplates, setAgreementTemplates] = useState([]);
 
   useEffect(() => {
     if (activeTab === 'onboarding') {
@@ -152,43 +212,41 @@ const Onboarding = () => {
   const fetchList = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterStatus) params.append('status', filterStatus);
-      if (filterDepartment) params.append('department', filterDepartment);
-      if (searchTerm) params.append('search', searchTerm);
-      // Add timestamp to prevent caching
-      params.append('_t', Date.now());
-      
-      console.log('🔍 Fetching onboarding list with params:', params.toString());
-      const res = await api.get(`/onboarding?${params.toString()}`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+      const res = await api.get('/onboarding', {
+        params: { 
+          status: filterStatus, 
+          department: filterDepartment, 
+          search: searchTerm,
+          _t: Date.now() // Add timestamp to prevent caching
         }
       });
-      console.log('📦 Onboarding API Response:', res?.data);
-      console.log('📋 Onboarding List Data:', res?.data?.data);
-      console.log('📊 List Length:', res?.data?.data?.length);
-      
-      setList(res?.data?.data || []);
-      setSummary(res?.data?.summary || {});
-      
-      if (res?.data?.data?.length === 0) {
-        console.warn('⚠️ No onboarding records returned from API');
-      }
+      setList(res.data.data);
+      console.log('📦 Onboarding API Response:', res.data);
+      console.log('📋 Onboarding List Data:', res.data.data);
+      console.log('📊 List Length:', res.data.data.length);
     } catch (e) {
-      console.error('❌ Error fetching onboarding list:', e);
-      toast.error(e?.response?.data?.message || 'Failed to load onboarding list');
+      console.error('Failed to fetch onboarding list:', e);
+      toast.error('Failed to fetch onboarding list');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Enhanced refresh function for immediate UI updates
+  const refreshImmediately = async () => {
+    // Clear any existing loading states to ensure immediate refresh
+    setLoading(false);
+    // Small delay to ensure backend has processed the update
+    await new Promise(resolve => setTimeout(resolve, 300));
+    // Fetch fresh data
+    await fetchList();
   };
 
   const updateStatus = async (id, newStatus, notes = '') => {
     try {
       await api.put(`/onboarding/${id}/status`, { status: newStatus, notes });
       toast.success('Status updated successfully');
-      fetchList();
+      await refreshImmediately();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Failed to update status');
     }
@@ -201,7 +259,7 @@ const Onboarding = () => {
         notes: `Stage skipped to ${statusLabels[targetStatus]?.label || targetStatus}` 
       });
       toast.success(`Skipped to ${statusLabels[targetStatus]?.label || targetStatus} stage`);
-      fetchList();
+      await refreshImmediately();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to skip stage');
     }
@@ -239,7 +297,7 @@ const Onboarding = () => {
         toast.success('Offer sent successfully');
       }
       
-      fetchList();
+      await refreshImmediately();
     } catch (e) {
       console.error('❌ Failed to send offer:', e.response?.data);
       const errorMessage = e?.response?.data?.message || 'Failed to send offer';
@@ -257,7 +315,7 @@ const Onboarding = () => {
     try {
       await api.post(`/onboarding/${id}/set-joining-date`, { joiningDate, notifyTeams });
       toast.success('Joining date set and teams notified');
-      fetchList();
+      await refreshImmediately();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Failed to set joining date');
     }
@@ -274,7 +332,7 @@ const Onboarding = () => {
       const response = await api.post(`/onboarding/${id}/complete`);
       if (response.data.success) {
         toast.success(response.data.message || 'Onboarding completed successfully');
-        fetchList();
+        await refreshImmediately();
       } else {
         // Handle validation errors
         if (response.data.errors && response.data.errors.length > 0) {
@@ -411,43 +469,79 @@ const Onboarding = () => {
   const fetchTemplates = async () => {
     setTemplateLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (templateFilter.status) params.append('status', templateFilter.status);
-      if (templateFilter.category) params.append('category', templateFilter.category);
-      if (templateFilter.search) params.append('search', templateFilter.search);
+      // Fetch offer templates
+      const res = await api.get('/offer-templates', {
+        params: templateFilter
+      });
+      setTemplates(res.data.data);
       
-      const response = await api.get(`/offer-templates?${params.toString()}`);
-      setTemplates(response.data.data || []);
-    } catch (error) {
-      toast.error('Failed to load offer templates');
-      console.error(error);
+      // Also fetch agreement templates
+      try {
+        console.log('🔍 Fetching agreement templates...');
+        const agreementRes = await api.get('/agreement-templates', {
+          params: {} // Remove status filter to see all templates
+        });
+        console.log('✅ Agreement templates response:', agreementRes.data);
+        console.log('📊 Agreement templates data:', agreementRes.data.data);
+        console.log('📊 Agreement templates count:', agreementRes.data.data?.length || 0);
+        
+        // If API returns templates, use them. Otherwise, keep the manual template.
+        if (agreementRes.data.data && agreementRes.data.data.length > 0) {
+          setAgreementTemplatesForManagement(agreementRes.data.data);
+        } else {
+          // Keep the manual template that was set in initial state
+          console.log('🔧 Keeping manual template since API returned no data');
+        }
+      } catch (agreementError) {
+        console.error('❌ Error fetching agreement templates:', agreementError);
+        console.error('❌ Error response:', agreementError.response?.data);
+        console.error('❌ Error status:', agreementError.response?.status);
+        
+        // Keep the manual template that was set in initial state
+        console.log('🔧 Keeping manual template due to API error');
+      }
+    } catch (e) {
+      console.error('Failed to fetch templates:', e);
+      toast.error('Failed to fetch templates');
     } finally {
       setTemplateLoading(false);
     }
   };
 
-  const saveTemplate = async (templateData) => {
+  const fetchAgreementTemplates = async () => {
     try {
-      if (editingTemplate) {
-        await api.put(`/offer-templates/${editingTemplate._id}`, templateData);
-        toast.success('Template updated successfully');
-      } else {
-        await api.post('/offer-templates', templateData);
-        toast.success('Template created successfully');
-      }
-      setShowTemplateModal(false);
-      setEditingTemplate(null);
-      fetchTemplates();
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to save template');
+      console.log('📋 Fetching agreement templates...');
+      const res = await api.get('/agreement-templates', {
+        params: { status: 'active' }
+      });
+      console.log('✅ Agreement templates API response:', res.data);
+      setAgreementTemplates(res.data.data || []);
+    } catch (e) {
+      console.error('Failed to fetch agreement templates:', e);
+      setAgreementTemplates([]);
     }
   };
 
-  const deleteTemplate = async (id) => {
+  const generateAgreement = async (id, agreementData) => {
+    try {
+      // Clear any existing toasts first to prevent duplicates
+      toast.dismiss();
+      const res = await api.post(`/onboarding/${id}/generate-agreement`, agreementData);
+      toast.success(res.data.message || 'Agreement generated successfully. Please complete the onboarding process.');
+      await refreshImmediately();
+    } catch (e) {
+      console.error('❌ Failed to generate agreement:', e.response?.data);
+      const errorMessage = e?.response?.data?.message || 'Failed to generate agreement';
+      toast.error(errorMessage);
+    }
+  };
+
+  const deleteTemplate = async (id, type = 'offer') => {
     if (!confirm('Are you sure you want to delete this template?')) return;
     
     try {
-      await api.delete(`/offer-templates/${id}`);
+      const endpoint = type === 'agreement' ? 'agreement-templates' : 'offer-templates';
+      await api.delete(`/${endpoint}/${id}`);
       toast.success('Template deleted successfully');
       fetchTemplates();
     } catch (error) {
@@ -455,7 +549,7 @@ const Onboarding = () => {
     }
   };
 
-  const duplicateTemplate = async (template) => {
+  const duplicateTemplate = async (template, type = 'offer') => {
     try {
       const newTemplate = {
         ...template,
@@ -465,8 +559,9 @@ const Onboarding = () => {
       delete newTemplate._id;
       delete newTemplate.createdAt;
       delete newTemplate.updatedAt;
-      
-      await api.post('/offer-templates', newTemplate);
+
+      const endpoint = type === 'agreement' ? 'agreement-templates' : 'offer-templates';
+      await api.post(`/${endpoint}`, newTemplate);
       toast.success('Template duplicated successfully');
       fetchTemplates();
     } catch (error) {
@@ -474,13 +569,40 @@ const Onboarding = () => {
     }
   };
 
-  const updateTemplateStatus = async (id, status) => {
+  const updateTemplateStatus = async (id, status, type = 'offer') => {
     try {
-      await api.put(`/offer-templates/${id}/status`, { status });
+      if (type === 'agreement') {
+        await api.put(`/agreement-templates/${id}`, { status });
+      } else {
+        await api.put(`/offer-templates/${id}/status`, { status });
+      }
       toast.success(`Template ${status === 'active' ? 'activated' : 'deactivated'} successfully`);
       fetchTemplates();
     } catch (error) {
       toast.error('Failed to update template status');
+    }
+  };
+
+  const saveTemplate = async (templateData) => {
+    try {
+      if (editingTemplate) {
+        // Update existing template
+        const endpoint = editingTemplateType === 'agreement' ? 'agreement-templates' : 'offer-templates';
+        await api.put(`/${endpoint}/${editingTemplate._id}`, templateData);
+        toast.success('Template updated successfully');
+      } else {
+        // Create new template
+        const createType = templateFilter.type === 'agreement' ? 'agreement' : 'offer';
+        const endpoint = createType === 'agreement' ? 'agreement-templates' : 'offer-templates';
+        await api.post(`/${endpoint}`, templateData);
+        toast.success('Template created successfully');
+      }
+      fetchTemplates();
+      setShowTemplateModal(false);
+      setEditingTemplate(null);
+      setEditingTemplateType('offer');
+    } catch (error) {
+      toast.error('Failed to save template');
     }
   };
 
@@ -551,7 +673,7 @@ const Onboarding = () => {
           >
             <div className="flex items-center justify-center space-x-2">
               <FileEdit size={18} />
-              <span>Offer Templates</span>
+              <span>Templates</span>
             </div>
           </button>
         </div>
@@ -631,9 +753,36 @@ const Onboarding = () => {
             onSendOffer={sendOffer}
             onSetJoiningDate={setJoiningDate}
             onComplete={completeOnboarding}
+            onRefresh={refreshImmediately}
             onOpenSendOfferModal={(candidate) => {
               setSelectedCandidate(candidate);
               setShowSendOfferModal(true);
+            }}
+            onOpenAgreementModal={async (item) => {
+              console.log('🔓 Opening Agreement Modal for:', item);
+              console.log('🔓 Item details:', { 
+                _id: item?._id, 
+                firstName: item?.firstName, 
+                lastName: item?.lastName,
+                employeeId: item?.employeeId?._id,
+                employeeFirstName: item?.employeeId?.firstName,
+                employeeLastName: item?.employeeId?.lastName
+              });
+              console.log('📋 Current agreement templates before fetch:', agreementTemplates.length);
+              
+              // Use the correct employee object
+              const employee = item.employeeId || item;
+              console.log('👤 Using employee:', employee);
+              
+              // First fetch templates, then open modal
+              await fetchAgreementTemplates();
+              // Wait a bit for state to update
+              setTimeout(() => {
+                console.log('📋 Agreement templates after fetch:', agreementTemplates.length);
+                setSelectedCandidate(employee);
+                setSelectedEmployee(employee);
+                setShowAgreementModal(true);
+              }, 100);
             }}
             onViewDetails={(onboarding) => {
               setSelectedOnboarding(onboarding);
@@ -690,17 +839,19 @@ const Onboarding = () => {
       {/* Templates Tab Content */}
       {activeTab === 'templates' && (
         <TemplatesSection
-          templates={templates}
+          offerTemplates={templates}
+          agreementTemplates={agreementTemplatesForManagement}
           loading={templateLoading}
           filter={templateFilter}
           setFilter={setTemplateFilter}
-          onEdit={(template) => {
+          onEdit={(template, type = 'offer') => {
             setEditingTemplate(template);
+            setEditingTemplateType(type);
             setShowTemplateModal(true);
           }}
-          onDelete={deleteTemplate}
-          onDuplicate={duplicateTemplate}
-          onUpdateStatus={updateTemplateStatus}
+          onDelete={(id, type = 'offer') => deleteTemplate(id, type)}
+          onDuplicate={(template, type = 'offer') => duplicateTemplate(template, type)}
+          onUpdateStatus={(id, status, type = 'offer') => updateTemplateStatus(id, status, type)}
         />
       )}
 
@@ -727,12 +878,30 @@ const Onboarding = () => {
           onSend={sendOffer}
         />
       )}
+
+      {/* Agreement Generation Modal */}
+      {console.log('🎬 Modal render check:', { showAgreementModal, selectedEmployee: !!selectedEmployee, templatesLength: agreementTemplates.length })}
+      {showAgreementModal && selectedEmployee && (
+        <>
+          {console.log('🎭 About to render AgreementModal with templates:', agreementTemplates.length)}
+          <AgreementModal
+            key={`agreement-modal-${agreementTemplates.length}`} // Force re-render when templates change
+            employee={selectedEmployee}
+            onClose={() => {
+              setShowAgreementModal(false);
+              setSelectedEmployee(null);
+            }}
+            onGenerate={generateAgreement}
+            templates={agreementTemplates}
+          />
+        </>
+      )}
     </div>
   );
 };
 
 // Onboarding Card Component
-const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, onComplete, onViewDetails, onOpenSendOfferModal, onRequestDocuments, onSkipStage, onRequestApproval, canEdit = true }) => {
+const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, onComplete, onViewDetails, onOpenSendOfferModal, onOpenAgreementModal, onRequestDocuments, onSkipStage, onRequestApproval, onRefresh, canEdit = true }) => {
   const [showActions, setShowActions] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [joiningDateInput, setJoiningDateInput] = useState('');
@@ -749,9 +918,13 @@ const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, o
   const isApprovalRejected = approvalStatus === 'rejected';
   const canRequestApproval = (item.status === 'preboarding' && approvalStatus === 'not_requested') || 
                              (item.status === 'approval_rejected' && approvalStatus === 'rejected');
+
+  // Hide approval button when admin has approved (status is payslip_upload_requested or higher)
+  const shouldHideApprovalButton = approvalStatus === 'approved' || 
+                                   ['payslip_upload_requested', 'payslip_verification', 'payslip_approved', 'payslip_rejected', 'offer_sent', 'background_verification', 'background_verified', 'background_rejected', 'offer_accepted'].includes(item.status);
   
   const handleRequestApproval = async () => {
-    if (!window.confirm('Request admin approval before sending offer letter? This will send a notification to the admin.')) {
+    if (!window.confirm('Request admin approval before payslip verification? This will send a notification to the admin.')) {
       return;
     }
     setRequestingApproval(true);
@@ -761,50 +934,122 @@ const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, o
       setRequestingApproval(false);
     }
   };
+
+  const handleRequestPayslipUpload = async () => {
+    if (!window.confirm('Send payslip verification request to candidate?')) {
+      return;
+    }
+    try {
+      const response = await api.post(`/onboarding/${item._id}/request-payslip-upload`);
+      toast.success(response.data.message || 'Payslip upload request sent successfully');
+      // Call parent refresh function
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to send payslip upload request');
+    }
+  };
+
+  const handleVerifyPayslip = async (action) => {
+    const actionText = action === 'approve' ? 'approve' : 'reject';
+    const notes = action === 'reject' ? prompt('Please provide reason for rejection:') : null;
+    
+    if (action === 'reject' && !notes) {
+      toast.error('Rejection reason is required');
+      return;
+    }
+    
+    if (!window.confirm(`Are you sure you want to ${actionText} this payslip?`)) {
+      return;
+    }
+    
+    try {
+      const response = await api.post(`/onboarding/${item._id}/verify-payslip`, {
+        action,
+        notes
+      });
+      toast.success(response.data.message || `Payslip ${actionText}ed successfully`);
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || `Failed to ${actionText} payslip`);
+    }
+  };
   
   const getNextActions = () => {
+    const actions = [];
+    
     switch (item.status) {
       case 'preboarding':
-        // If approval is granted, allow sending offer
-        if (isApprovalGranted) {
-          return [
-            { label: 'Send Offer', action: () => onOpenSendOfferModal(item), color: 'btn-primary' }
-          ];
-        }
-        // If approval is pending, no actions
-        if (isApprovalPending) {
-          return [];
-        }
-        // Otherwise, show request approval button
-        return [];
+        // Don't add Request Approval here - it's handled in the approval status section
+        break;
       case 'pending_approval':
-        return []; // Waiting for admin action
+        if (approvalStatus === 'approved') {
+          actions.push({ label: 'Send Payslip Request', action: () => handleRequestPayslipUpload(), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' });
+        }
+        break;
+      case 'payslip_upload_requested':
+        // Show payslip request button when admin has approved and status is payslip_upload_requested
+        if (approvalStatus === 'approved') {
+          actions.push({ label: 'Send Payslip Request', action: () => handleRequestPayslipUpload(), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' });
+        }
+        break;
+      case 'payslip_verification':
+        actions.push(
+          { label: 'Accept Payslip', action: () => handleVerifyPayslip('approve'), color: 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all' },
+          { label: 'Reject Payslip', action: () => handleVerifyPayslip('reject'), color: 'px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all' }
+        );
+        break;
+      case 'payslip_approved':
+        actions.push(
+          { label: 'Send Offer', action: () => onOpenSendOfferModal(item), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' },
+          { label: 'Reject Candidate', action: () => onUpdateStatus(item._id, 'rejected'), color: 'px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all' }
+        );
+        break;
+      case 'payslip_rejected':
+        actions.push({ label: 'Re-request Payslip', action: () => onUpdateStatus(item._id, 'payslip_upload_requested'), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' });
+        break;
       case 'approval_rejected':
-        return []; // HR can re-request via button below
+        break; // HR can re-request via button below
       case 'offer_sent':
-        return [
-          { label: 'Mark Accepted', action: () => onUpdateStatus(item._id, 'offer_accepted'), color: 'btn-success' },
-          { label: 'Mark Rejected', action: () => onUpdateStatus(item._id, 'rejected'), color: 'btn-danger' }
-        ];
+        actions.push(
+          { label: 'Mark Offer Accepted', action: () => onUpdateStatus(item._id, 'offer_accepted'), color: 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all' },
+          { label: 'Mark Offer Rejected', action: () => onUpdateStatus(item._id, 'rejected'), color: 'px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all' }
+        );
+        break;
       case 'offer_accepted':
-        return [
-          { label: 'Request Documents', action: () => onUpdateStatus(item._id, 'docs_pending'), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' }
-        ];
+        actions.push({ label: 'Start Background Verification', action: () => onUpdateStatus(item._id, 'background_verification'), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' });
+        break;
+      case 'background_verification':
+        actions.push(
+          { label: 'Background Verified', action: () => onUpdateStatus(item._id, 'background_verified'), color: 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all' },
+          { label: 'Background Rejected', action: () => onUpdateStatus(item._id, 'background_rejected'), color: 'px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all' }
+        );
+        break;
+      case 'background_verified':
+        actions.push({ label: 'Request Documents', action: () => onUpdateStatus(item._id, 'docs_pending'), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' });
+        break;
       case 'docs_pending':
-        return [
-          { label: 'Verify Documents', action: () => onUpdateStatus(item._id, 'docs_verified'), color: 'btn-success' }
-        ];
+        actions.push({ label: 'Verify Documents', action: () => onUpdateStatus(item._id, 'docs_verified'), color: 'btn-success' });
+        break;
       case 'docs_verified':
-        return [
-          { label: 'Set Joining Date', action: () => handleSetJoiningDate(), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' }
-        ];
+        actions.push({ label: 'Set Joining Date', action: () => handleSetJoiningDate(), color: 'px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20' });
+        break;
       case 'ready_for_joining':
-        return [
-          { label: 'Complete Onboarding', action: () => onComplete(item._id), color: 'btn-success' }
-        ];
+        actions.push({ label: 'Generate Agreement', action: () => onOpenAgreementModal(item), color: 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium' });
+        break;
+      case 'agreement_generated':
+        actions.push({ label: 'Complete Onboarding', action: () => onComplete(item._id), color: 'btn-success' });
+        break;
+      case 'completed':
+        break;
       default:
-        return [];
+        break;
     }
+    
+    return actions;
   };
 
   const handleSetJoiningDate = () => {
@@ -861,15 +1106,17 @@ const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, o
           </button>
           {canEdit && (
             <div className="relative">
-              <button
-                onClick={() => setShowActions(!showActions)}
-                className="px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors text-sm"
-              >
-                <MoreHorizontal size={16} />
-              </button>
-              {showActions && (
+              {nextActions.length > 2 && (
+                <button
+                  onClick={() => setShowActions(!showActions)}
+                  className="px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors text-sm"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              )}
+              {showActions && nextActions.length > 2 && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
-                  {nextActions.map((action, idx) => (
+                  {nextActions.slice(2).map((action, idx) => (
                     <button
                       key={idx}
                       onClick={() => {
@@ -901,7 +1148,7 @@ const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, o
       />
 
       {/* Approval Status Indicator - Show when in preboarding or approval-related states */}
-      {(item.status === 'preboarding' || item.status === 'pending_approval' || item.status === 'approval_rejected') && (
+      {(item.status === 'preboarding' || item.status === 'pending_approval' || item.status === 'payslip_upload_requested' || item.status === 'approval_rejected') && (
         <div className={`mb-4 p-3 rounded-lg border ${
           isApprovalGranted ? 'bg-green-900/20 border-green-800' :
           isApprovalPending ? 'bg-amber-900/20 border-amber-800' :
@@ -920,15 +1167,15 @@ const OnboardingCard = ({ item, onUpdateStatus, onSendOffer, onSetJoiningDate, o
                 <AlertCircle size={16} className="text-blue-400" />
               )}
               <span className={`text-sm font-medium ${approvalInfo.textColor}`}>
-                {isApprovalGranted ? 'Admin Approved - Ready to send offer' :
+                {isApprovalGranted ? 'Admin Approved - Ready to request payslip verification' :
                  isApprovalPending ? 'Waiting for Admin Approval...' :
                  isApprovalRejected ? `Approval Rejected: ${item.approvalStatus?.rejectionReason || 'No reason provided'}` :
-                 'Admin approval required before sending offer'}
+                 'Admin approval required before payslip verification'}
               </span>
             </div>
             
             {/* Request Approval / Re-Request Button */}
-            {canEdit && canRequestApproval && (
+            {canEdit && canRequestApproval && !shouldHideApprovalButton && (
               <button
                 onClick={handleRequestApproval}
                 disabled={requestingApproval}
@@ -1350,7 +1597,19 @@ const OnboardingDetailsModal = ({ onboarding, onClose, verifyingDoc, onAcceptDoc
 };
 
 // Templates Section Component
-const TemplatesSection = ({ templates, loading, filter, setFilter, onEdit, onDelete, onDuplicate, onUpdateStatus }) => {
+const TemplatesSection = ({ offerTemplates, agreementTemplates, loading, filter, setFilter, onEdit, onDelete, onDuplicate, onUpdateStatus }) => {
+  const [templateType, setTemplateType] = useState('offer'); // 'offer' or 'agreement'
+  
+  const currentTemplates = templateType === 'offer' ? offerTemplates : agreementTemplates;
+  
+  // Debug logging
+  console.log('🔍 TemplatesSection Debug:');
+  console.log('  - templateType:', templateType);
+  console.log('  - offerTemplates length:', offerTemplates.length);
+  console.log('  - agreementTemplates length:', agreementTemplates.length);
+  console.log('  - currentTemplates length:', currentTemplates.length);
+  console.log('  - currentTemplates:', currentTemplates);
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1361,6 +1620,44 @@ const TemplatesSection = ({ templates, loading, filter, setFilter, onEdit, onDel
 
   return (
     <>
+      {/* Template Type Tabs */}
+      <div className="card p-1 mb-4">
+        <div className="flex space-x-2">
+          <button
+            onClick={() => {
+              setTemplateType('offer');
+              setFilter({ ...filter, type: 'offer' });
+            }}
+            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+              templateType === 'offer'
+                ? 'bg-primary-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-[#1E1E2A]'
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <FileEdit size={18} />
+              <span>Offer Templates ({offerTemplates.length})</span>
+            </div>
+          </button>
+          <button
+            onClick={() => {
+              setTemplateType('agreement');
+              setFilter({ ...filter, type: 'agreement' });
+            }}
+            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+              templateType === 'agreement'
+                ? 'bg-primary-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-[#1E1E2A]'
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <FileText size={18} />
+              <span>Agreement Templates ({agreementTemplates.length})</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-4">
@@ -1392,18 +1689,29 @@ const TemplatesSection = ({ templates, loading, filter, setFilter, onEdit, onDel
             className="input-field w-40"
           >
             <option value="">All Categories</option>
-            <option value="full-time">Full Time</option>
-            <option value="part-time">Part Time</option>
-            <option value="contract">Contract</option>
-            <option value="intern">Intern</option>
-            <option value="executive">Executive</option>
+            {templateType === 'offer' ? (
+              <>
+                <option value="full-time">Full Time</option>
+                <option value="part-time">Part Time</option>
+                <option value="contract">Contract</option>
+                <option value="intern">Intern</option>
+                <option value="executive">Executive</option>
+              </>
+            ) : (
+              <>
+                <option value="employment">Employment</option>
+                <option value="confidentiality">Confidentiality</option>
+                <option value="remote-work">Remote Work</option>
+                <option value="internship">Internship</option>
+              </>
+            )}
           </select>
         </div>
       </div>
 
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {templates.map((template) => (
+        {currentTemplates.map((template) => (
           <div key={template._id} className="card p-4 hover:border-primary-500 transition-colors">
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
@@ -1438,33 +1746,39 @@ const TemplatesSection = ({ templates, loading, filter, setFilter, onEdit, onDel
                   <span className="text-white">{template.usageCount} times</span>
                 </div>
               )}
+              {template.subject && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Subject:</span>
+                  <span className="text-white text-xs truncate max-w-[150px]">{template.subject}</span>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => onEdit(template)}
+                onClick={() => onEdit(template, templateType)}
                 className="flex-1 px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors text-sm py-2"
               >
                 <Edit size={14} className="inline mr-1" />
                 Edit
               </button>
               <button
-                onClick={() => onDuplicate(template)}
+                onClick={() => onDuplicate(template, templateType)}
                 className="px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors p-2"
                 title="Duplicate"
               >
                 <Copy size={16} />
               </button>
               <button
-                onClick={() => onUpdateStatus(template._id, template.status === 'active' ? 'inactive' : 'active')}
+                onClick={() => onUpdateStatus(template._id, template.status === 'active' ? 'inactive' : 'active', templateType)}
                 className={`px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors p-2 ${template.status === 'active' ? 'text-yellow-400' : 'text-green-400'}`}
                 title={template.status === 'active' ? 'Deactivate' : 'Activate'}
               >
                 {template.status === 'active' ? <Clock size={16} /> : <CheckCircle size={16} />}
               </button>
               <button
-                onClick={() => onDelete(template._id)}
+                onClick={() => onDelete(template._id, templateType)}
                 className="px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors p-2 text-red-400 hover:bg-red-500/10"
                 title="Delete"
               >
@@ -1475,14 +1789,21 @@ const TemplatesSection = ({ templates, loading, filter, setFilter, onEdit, onDel
         ))}
       </div>
 
-      {templates.length === 0 && (
+      {currentTemplates.length === 0 && (
         <div className="text-center py-12">
-          <FileEdit size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-400 text-lg">No templates found</p>
+          {templateType === 'offer' ? (
+            <FileEdit size={48} className="mx-auto text-gray-600 mb-4" />
+          ) : (
+            <FileText size={48} className="mx-auto text-gray-600 mb-4" />
+          )}
+          <p className="text-gray-400 text-lg">No {templateType} templates found</p>
           <p className="text-gray-500 text-sm mt-2">
             {filter.search || filter.status || filter.category
               ? 'Try adjusting your filters'
-              : 'Create your first offer template to get started'}
+              : templateType === 'offer' 
+                ? 'Create your first offer template to get started'
+                : 'Create your first agreement template to get started'
+            }
           </p>
         </div>
       )}
@@ -2282,6 +2603,194 @@ const RejectionModal = ({ isOpen, onClose, document, rejectionNotes, setRejectio
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Agreement Generation Modal Component
+const AgreementModal = ({ employee, onClose, onGenerate, templates }) => {
+  console.log('🔍 AgreementModal Debug:');
+  console.log('  - templates prop length:', templates?.length || 0);
+  console.log('  - templates prop:', templates);
+  
+  const [formData, setFormData] = useState({
+    templateId: '',
+    effectiveDate: '',
+    expiryDate: '',
+    agreementDetails: {}
+  });
+  const [loading, setLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+
+  // Update form when templates change
+  React.useEffect(() => {
+    console.log('🔄 AgreementModal: Templates updated, length:', templates?.length || 0);
+    if (templates && templates.length > 0 && !formData.templateId) {
+      // Auto-select first template if none selected
+      setFormData(prev => ({ ...prev, templateId: templates[0]._id }));
+      setSelectedTemplate(templates[0]);
+    }
+  }, [templates, formData.templateId]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.templateId) {
+      toast.error('Please select an agreement template');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onGenerate(employee._id, formData);
+      onClose();
+    } catch (error) {
+      console.error('❌ Error in handleSubmit:', error);
+      toast.error('Failed to generate agreement');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTemplateChange = (templateId) => {
+    setFormData({ ...formData, templateId });
+    const template = templates.find(t => t._id === templateId);
+    setSelectedTemplate(template);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-dark-900 border border-dark-700 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-dark-900 border-b border-dark-700 p-6 flex items-center justify-between z-10">
+          <div>
+            <h2 className="text-xl font-bold text-white">Generate Employment Agreement</h2>
+            <p className="text-gray-400 text-sm mt-1">Select a template and fill in the agreement details</p>
+          </div>
+          <button onClick={onClose} className="px-4 py-2 bg-[#1E1E2A] border border-gray-700 text-gray-200 rounded-lg hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors p-2">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Employee Info */}
+          <div className="bg-[#1E1E2A] border border-gray-700 rounded-lg p-4">
+            <h3 className="text-white font-medium mb-2">Employee Information</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-400">Name:</span>
+                <p className="text-white">{employee.candidateName}</p>
+              </div>
+              <div>
+                <span className="text-gray-400">Email:</span>
+                <p className="text-white">{employee.candidateEmail}</p>
+              </div>
+              <div>
+                <span className="text-gray-400">Position:</span>
+                <p className="text-white">{employee.position}</p>
+              </div>
+              <div>
+                <span className="text-gray-400">Status:</span>
+                <p className="text-white">{employee.status}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Template Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Agreement Template <span className="text-red-400">*</span>
+            </label>
+            {templates.length === 0 ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                <p className="text-yellow-800 text-sm mb-2">No templates available</p>
+                <p className="text-yellow-700 text-xs">Please contact your administrator to set up agreement templates.</p>
+              </div>
+            ) : (
+              <select
+                value={formData.templateId}
+                onChange={(e) => handleTemplateChange(e.target.value)}
+                className="w-full px-4 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent"
+                required
+              >
+                <option value="">Select Template</option>
+                {templates.map((template) => (
+                  <option key={template._id} value={template._id}>
+                    {template.name} - {template.category}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Template Preview */}
+          {selectedTemplate && (
+            <div className="bg-[#1E1E2A] border border-gray-700 rounded-lg p-4">
+              <h3 className="text-white font-medium mb-2">Template Preview</h3>
+              <p className="text-gray-300 text-sm mb-2">{selectedTemplate.description}</p>
+              <div className="text-xs text-gray-400">
+                <p><strong>Subject:</strong> {selectedTemplate.subject}</p>
+                <p><strong>Category:</strong> {selectedTemplate.category}</p>
+                <p><strong>Variables:</strong> {selectedTemplate.variables?.length || 0} placeholders</p>
+              </div>
+            </div>
+          )}
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Effective Date
+              </label>
+              <input
+                type="date"
+                value={formData.effectiveDate}
+                onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
+                className="w-full px-4 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Expiry Date (Optional)
+              </label>
+              <input
+                type="date"
+                value={formData.expiryDate}
+                onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                className="w-full px-4 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-[#A88BFF] text-white rounded-lg hover:bg-[#B89CFF] transition-all shadow-lg shadow-[#A88BFF]/20 flex items-center space-x-2"
+              disabled={loading || templates.length === 0}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <FileText size={18} />
+                  <span>Generate Agreement</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
