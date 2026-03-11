@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import { Users, Plus, FileText, UploadCloud, Search, Clock, Filter, X, Loader2, Download, CheckCircle, AlertCircle, FileSpreadsheet, MoreVertical, Briefcase, Calendar, FileSignature, UserCheck, XCircle, ArrowRight } from 'lucide-react';
@@ -46,6 +47,7 @@ const CandidateStatusBadge = ({ entry }) => {
 };
 
 const HRCandidatePool = () => {
+  const navigate = useNavigate();
   const [allEntries, setAllEntries] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -913,11 +915,11 @@ const HRCandidatePool = () => {
             Add Raw Text
           </button>
           <button
-            onClick={openFileModal}
+            onClick={() => navigate('/employee/hr/resume-parser')}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E1E2A] border border-gray-700 text-gray-200 text-sm font-medium hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
           >
             <UploadCloud className="w-4 h-4" />
-            Upload Resume File
+            Upload Resume
           </button>
           <button
             onClick={() => setShowBulkUploadModal(true)}

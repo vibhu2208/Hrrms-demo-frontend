@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import { Users, Plus, FileText, UploadCloud, Search, Clock, Filter, X, Loader2, Download, CheckCircle, AlertCircle, FileSpreadsheet, MoreVertical, ArrowRight, Calendar, Briefcase, UserCheck, FileSignature, XCircle } from 'lucide-react';
 import { getEmploymentTypeStyle, getEmploymentTypeLabel } from '../../utils/employmentTypeConstants';
 
 const CandidateList = () => {
+  const { user } = useAuth();
   const [allEntries, setAllEntries] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -858,13 +860,16 @@ const CandidateList = () => {
             <Plus className="w-4 h-4" />
             Add Raw Text
           </button>
-          <button
-            onClick={openFileModal}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E1E2A] border border-gray-700 text-gray-200 text-sm font-medium hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
-          >
-            <UploadCloud className="w-4 h-4" />
-            Upload Resume File
-          </button>
+          {/* Hide Upload Resume button for admin users */}
+          {user?.role !== 'admin' && user?.role !== 'company_admin' && (
+            <button
+              onClick={openFileModal}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E1E2A] border border-gray-700 text-gray-200 text-sm font-medium hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
+            >
+              <UploadCloud className="w-4 h-4" />
+              Upload Resume File
+            </button>
+          )}
           <button
             onClick={() => setShowBulkUploadModal(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E1E2A] border border-gray-700 text-gray-200 text-sm font-medium hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
