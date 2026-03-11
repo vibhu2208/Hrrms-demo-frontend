@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { Users, Plus, FileText, UploadCloud, Search, Clock, Filter, X, Loader2, Download, CheckCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { Users, Plus, FileText, UploadCloud, Search, Clock, Filter, X, Loader2, Download, CheckCircle, AlertCircle, FileSpreadsheet, MoreVertical, ArrowRight, Calendar, Briefcase, UserCheck, FileSignature, XCircle } from 'lucide-react';
 import { getEmploymentTypeStyle, getEmploymentTypeLabel } from '../../utils/employmentTypeConstants';
 
 const CandidateList = () => {
@@ -22,6 +22,24 @@ const CandidateList = () => {
   const [validating, setValidating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  
+  // Move candidate modal state
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [moveCandidate, setMoveCandidate] = useState(null);
+  const [moveTarget, setMoveTarget] = useState('');
+  const [jobPostings, setJobPostings] = useState([]);
+  const [selectedJobPosting, setSelectedJobPosting] = useState('');
+  const [movingCandidate, setMovingCandidate] = useState(false);
+  const [loadingJobPostings, setLoadingJobPostings] = useState(false);
+  const [interviewDetails, setInterviewDetails] = useState({
+    type: 'Technical',
+    scheduledDate: '',
+    scheduledTime: '',
+    meetingLink: '',
+    meetingPlatform: 'Google Meet'
+  });
+  const [showActionsDropdown, setShowActionsDropdown] = useState(null);
+  
   const [filters, setFilters] = useState({
     minExperience: '',
     maxExperience: ''
@@ -214,6 +232,18 @@ const CandidateList = () => {
     loadAvailableJDs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Close actions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showActionsDropdown && !event.target.closest('.relative')) {
+        setShowActionsDropdown(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showActionsDropdown]);
 
   const handleSearch = () => {
     fetchCandidatePool({ page: 1 });
@@ -581,6 +611,127 @@ const CandidateList = () => {
     }
   };
 
+  // Load job postings for candidate movement
+  const loadJobPostingsForMove = async () => {
+    setLoadingJobPostings(true);
+    try {
+      console.log('Loading job postings for candidate move...');
+      const response = await api.get('/candidates/job-postings-for-move');
+      console.log('Job postings response:', response.data);
+      if (response.data.success) {
+        setJobPostings(response.data.data);
+        console.log('Job postings loaded:', response.data.data.length);
+      } else {
+        console.warn('Job postings request succeeded but success=false');
+        setJobPostings([]);
+      }
+    } catch (error) {
+      console.error('Failed to load job postings:', error);
+      console.error('Error details:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to load job postings');
+      setJobPostings([]);
+    } finally {
+      setLoadingJobPostings(false);
+    }
+  };
+
+  // Open move candidate modal
+  const openMoveModal = (entry, target) => {
+    setMoveCandidate(entry);
+    setMoveTarget(target);
+    setSelectedJobPosting('');
+    setInterviewDetails({
+      type: 'Technical',
+      scheduledDate: '',
+      scheduledTime: '',
+      meetingLink: '',
+      meetingPlatform: 'Google Meet'
+    });
+    setShowActionsDropdown(null);
+    
+    // Load job postings if needed for this target
+    if (['applicant', 'onboarding', 'interview'].includes(target)) {
+      loadJobPostingsForMove();
+    }
+    
+    setShowMoveModal(true);
+  };
+
+  // Close move modal
+  const closeMoveModal = () => {
+    setShowMoveModal(false);
+    setMoveCandidate(null);
+    setMoveTarget('');
+    setSelectedJobPosting('');
+  };
+
+  // Handle move candidate to section
+  const handleMoveCandidate = async () => {
+    if (!moveCandidate || !moveTarget) return;
+
+    // Validate required fields based on target
+    if (['applicant', 'onboarding'].includes(moveTarget) && !selectedJobPosting && !moveCandidate.original?.appliedFor) {
+      toast.error('Please select a job posting');
+      return;
+    }
+
+    if (moveTarget === 'interview') {
+      if (!interviewDetails.scheduledDate || !interviewDetails.scheduledTime) {
+        toast.error('Please provide interview date and time');
+        return;
+      }
+    }
+
+    setMovingCandidate(true);
+
+    try {
+      const payload = {
+        targetSection: moveTarget,
+        jobPostingId: selectedJobPosting || undefined,
+        reason: `Moved to ${moveTarget} from candidate pool`
+      };
+
+      // Add interview details if moving to interview
+      if (moveTarget === 'interview') {
+        payload.interviewDetails = interviewDetails;
+      }
+
+      const response = await api.post(`/candidates/${moveCandidate.id}/move-to-section`, payload);
+
+      if (response.data.success) {
+        toast.success(response.data.message || `Candidate moved to ${moveTarget} successfully`);
+        closeMoveModal();
+        await fetchCandidatePool({ page: page });
+      } else {
+        toast.error(response.data.message || 'Failed to move candidate');
+      }
+    } catch (error) {
+      console.error('Failed to move candidate:', error);
+      toast.error(error.response?.data?.message || 'Failed to move candidate');
+    } finally {
+      setMovingCandidate(false);
+    }
+  };
+
+  // Get move target label
+  const getMoveTargetLabel = (target) => {
+    const labels = {
+      'applicant': 'Applicant Pool',
+      'shortlisted': 'Shortlisted',
+      'interview': 'Schedule Interview',
+      'offer': 'Extend Offer',
+      'onboarding': 'Onboarding',
+      'contract': 'Contract',
+      'rejected': 'Rejected'
+    };
+    return labels[target] || target;
+  };
+
+  // Check if job posting selection is required
+  const needsJobPosting = (target) => {
+    return ['applicant', 'onboarding'].includes(target);
+  };
+
   const handleBulkUploadFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -908,7 +1059,13 @@ const CandidateList = () => {
                   </td>
                 </tr>
               ) : (
-                entries.map((entry) => (
+                entries.map((entry) => {
+                  // Debug: Log entry type to console
+                  if (!entry._debugLogged) {
+                    console.log('Entry type:', entry.type, 'Entry:', entry);
+                    entry._debugLogged = true;
+                  }
+                  return (
                   <tr
                     key={entry.id}
                     className="border-t border-gray-800 hover:bg-[#1E1E2A]/60 transition-colors"
@@ -1046,30 +1203,98 @@ const CandidateList = () => {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <select
-                          className="px-2 py-1 bg-[#1E1E2A] border border-gray-700 rounded text-xs text-gray-200 focus:outline-none focus:border-[#A88BFF]"
-                          defaultValue={entry.stage || 'applied'}
-                          onChange={(e) => handleStageChange(entry, e.target.value)}
-                        >
-                          <option value="applied">Applied</option>
-                          <option value="shortlisted">Shortlisted</option>
-                          <option value="interview-scheduled">Interview</option>
-                          <option value="interviewed">Interviewed</option>
-                          <option value="offer-extended">Offer Extended</option>
-                          <option value="offer-accepted">Offer Accepted</option>
-                          <option value="rejected">Rejected</option>
-                          <option value="onboarded">Onboarded</option>
-                        </select>
-                    <button 
+                        {/* View Details Button */}
+                        <button 
                           onClick={() => openEntryModal(entry)}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-700 text-xs text-gray-200 hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
-                    >
+                          title="View Details"
+                        >
                           <FileText className="w-3 h-3" />
-                    </button>
+                        </button>
+                        
+                        {/* Actions Dropdown - Show for all candidates */}
+                        {(entry.type === 'candidate' || !entry.type || entry.original?.firstName) && (
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowActionsDropdown(showActionsDropdown === entry.id ? null : entry.id)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-700 text-xs text-gray-200 hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
+                              title="Actions"
+                            >
+                              <MoreVertical className="w-3 h-3" />
+                            </button>
+                            
+                            {showActionsDropdown === entry.id && (
+                              <div className="absolute right-0 top-full mt-1 w-48 bg-[#2A2A3A] border border-gray-700 rounded-lg shadow-xl z-50 py-1">
+                                <div className="px-3 py-1.5 text-[10px] text-gray-500 uppercase font-semibold border-b border-gray-700">
+                                  Move To
+                                </div>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'applicant')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <Briefcase className="w-3 h-3 text-blue-400" />
+                                  Applicant Pool
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'shortlisted')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <CheckCircle className="w-3 h-3 text-green-400" />
+                                  Shortlisted
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'interview')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <Calendar className="w-3 h-3 text-purple-400" />
+                                  Schedule Interview
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'offer')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <FileSignature className="w-3 h-3 text-yellow-400" />
+                                  Extend Offer
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'onboarding')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <UserCheck className="w-3 h-3 text-cyan-400" />
+                                  Move to Onboarding
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'contract')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <FileText className="w-3 h-3 text-orange-400" />
+                                  Contract
+                                </button>
+                                
+                                <div className="border-t border-gray-700 mt-1 pt-1">
+                                  <button
+                                    onClick={() => openMoveModal(entry, 'rejected')}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                                  >
+                                    <XCircle className="w-3 h-3" />
+                                    Reject Candidate
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                   </td>
                 </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -1869,6 +2094,232 @@ const CandidateList = () => {
                   Create JD
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move Candidate Modal */}
+      {showMoveModal && moveCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && closeMoveModal()}>
+          <div className="w-full max-w-lg bg-[#2A2A3A] border border-gray-800 rounded-2xl shadow-xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <div>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <ArrowRight className="w-4 h-4 text-[#A88BFF]" />
+                  Move to {getMoveTargetLabel(moveTarget)}
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  Moving: <span className="text-white">{moveCandidate.name}</span>
+                </p>
+                {/* Debug info */}
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Target: {moveTarget} | Needs JP: {needsJobPosting(moveTarget) ? 'Yes' : 'No'} | Is Interview: {moveTarget === 'interview' ? 'Yes' : 'No'}
+                </p>
+              </div>
+              <button
+                onClick={closeMoveModal}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[60vh]">
+              {/* Current Status */}
+              <div className="bg-[#1E1E2A] border border-gray-800 rounded-lg p-3">
+                <div className="text-xs text-gray-500 mb-1">Current Status</div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-[#A88BFF]/10 text-[#A88BFF] border border-[#A88BFF]/30 capitalize">
+                    {moveCandidate.stage || moveCandidate.statusLabel || 'applied'}
+                  </span>
+                  {moveCandidate.original?.appliedFor?.title && (
+                    <span className="text-xs text-gray-400">
+                      for {moveCandidate.original.appliedFor.title}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Job Posting Selection - for applicant and onboarding */}
+              {needsJobPosting(moveTarget) && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-2">
+                    Select Job Posting <span className="text-red-400">*</span>
+                  </label>
+                  {loadingJobPostings ? (
+                    <div className="flex items-center justify-center py-3 bg-[#1E1E2A] border border-gray-700 rounded-lg">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#A88BFF] mr-2" />
+                      <span className="text-xs text-gray-400">Loading job postings...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedJobPosting}
+                        onChange={(e) => setSelectedJobPosting(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                        disabled={jobPostings.length === 0}
+                      >
+                        <option value="">-- Select a job posting --</option>
+                        {jobPostings.map(jp => (
+                          <option key={jp._id} value={jp._id}>
+                            {jp.title} - {jp.department} ({jp.employmentType})
+                          </option>
+                        ))}
+                      </select>
+                      {jobPostings.length === 0 && !loadingJobPostings && (
+                        <p className="text-xs text-yellow-400 mt-1">
+                          ⚠️ No active job postings found. Please create a job posting first.
+                        </p>
+                      )}
+                      {jobPostings.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {jobPostings.length} job posting{jobPostings.length !== 1 ? 's' : ''} available
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Interview Details - for interview target */}
+              {moveTarget === 'interview' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Interview Type
+                      </label>
+                      <select
+                        value={interviewDetails.type}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, type: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      >
+                        <option value="Technical">Technical</option>
+                        <option value="HR">HR</option>
+                        <option value="Managerial">Managerial</option>
+                        <option value="Cultural Fit">Cultural Fit</option>
+                        <option value="Final Round">Final Round</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Platform
+                      </label>
+                      <select
+                        value={interviewDetails.meetingPlatform}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, meetingPlatform: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      >
+                        <option value="Google Meet">Google Meet</option>
+                        <option value="Microsoft Teams">Microsoft Teams</option>
+                        <option value="Zoom">Zoom</option>
+                        <option value="Phone">Phone</option>
+                        <option value="In-Person">In-Person</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Date <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={interviewDetails.scheduledDate}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Time <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={interviewDetails.scheduledTime}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">
+                      Meeting Link
+                    </label>
+                    <input
+                      type="url"
+                      value={interviewDetails.meetingLink}
+                      onChange={(e) => setInterviewDetails(prev => ({ ...prev, meetingLink: e.target.value }))}
+                      placeholder="https://meet.google.com/..."
+                      className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#A88BFF]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Info message based on target */}
+              <div className={`p-3 rounded-lg text-xs ${
+                moveTarget === 'rejected' 
+                  ? 'bg-red-500/10 border border-red-500/30 text-red-300'
+                  : moveTarget === 'onboarding'
+                  ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-300'
+                  : 'bg-blue-500/10 border border-blue-500/30 text-blue-300'
+              }`}>
+                {moveTarget === 'applicant' && (
+                  <p>The candidate will be moved to the applicant pool for the selected job posting.</p>
+                )}
+                {moveTarget === 'shortlisted' && (
+                  <p>The candidate will be shortlisted and notified via email.</p>
+                )}
+                {moveTarget === 'interview' && (
+                  <p>An interview will be scheduled and the candidate will receive an email notification with the details.</p>
+                )}
+                {moveTarget === 'offer' && (
+                  <p>An offer will be extended to the candidate and they will receive an offer email.</p>
+                )}
+                {moveTarget === 'onboarding' && (
+                  <p>The candidate will be moved to onboarding. An onboarding record will be created and document upload link will be sent.</p>
+                )}
+                {moveTarget === 'contract' && (
+                  <p>The candidate will be moved to contract stage for contract-based employment.</p>
+                )}
+                {moveTarget === 'rejected' && (
+                  <p>The candidate will be rejected and notified via email. This action cannot be easily undone.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-800 flex items-center justify-end gap-3">
+              <button
+                onClick={closeMoveModal}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-xs text-gray-300 hover:border-gray-500 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMoveCandidate}
+                disabled={movingCandidate || (needsJobPosting(moveTarget) && !selectedJobPosting && !moveCandidate.original?.appliedFor)}
+                className={`px-4 py-2 rounded-lg text-xs text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  moveTarget === 'rejected'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-[#A88BFF] hover:bg-[#B89CFF]'
+                }`}
+              >
+                {movingCandidate ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Moving...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="w-3 h-3" />
+                    Move to {getMoveTargetLabel(moveTarget)}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

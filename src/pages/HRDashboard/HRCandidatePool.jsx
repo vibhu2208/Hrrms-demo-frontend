@@ -1,7 +1,49 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { Users, Plus, FileText, UploadCloud, Search, Clock, Filter, X, Loader2, Download, CheckCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { Users, Plus, FileText, UploadCloud, Search, Clock, Filter, X, Loader2, Download, CheckCircle, AlertCircle, FileSpreadsheet, MoreVertical, Briefcase, Calendar, FileSignature, UserCheck, XCircle, ArrowRight } from 'lucide-react';
+
+// Component for dynamic candidate status badge
+const CandidateStatusBadge = ({ entry }) => {
+  console.log('🔍 CandidateStatusBadge called for:', entry.name);
+  console.log('   Entry type:', entry.type);
+  console.log('   Entry stage:', entry.stage);
+  console.log('   Original stage:', entry.original?.stage);
+  console.log('   Is Ex-Employee:', entry.original?.isExEmployee);
+
+  if (entry.original?.isExEmployee) {
+    return (
+      <span className="px-2 py-0.5 text-[10px] rounded-full border bg-orange-500/10 text-orange-300 border-orange-500/30">
+        Ex-Employee
+      </span>
+    );
+  }
+
+  const stage = entry.original?.stage || entry.stage || 'applied';
+  console.log('   Final stage used:', stage);
+  
+  const statusMap = {
+    'applied': { label: 'Applied', bgColor: 'bg-blue-500/10', textColor: 'text-blue-300', borderColor: 'border-blue-500/30' },
+    'screening': { label: 'Screening', bgColor: 'bg-yellow-500/10', textColor: 'text-yellow-300', borderColor: 'border-yellow-500/30' },
+    'shortlisted': { label: 'Shortlisted', bgColor: 'bg-green-500/10', textColor: 'text-green-300', borderColor: 'border-green-500/30' },
+    'interview-scheduled': { label: 'Interview', bgColor: 'bg-purple-500/10', textColor: 'text-purple-300', borderColor: 'border-purple-500/30' },
+    'interview-completed': { label: 'Interviewed', bgColor: 'bg-purple-500/10', textColor: 'text-purple-300', borderColor: 'border-purple-500/30' },
+    'offer-extended': { label: 'Offer Extended', bgColor: 'bg-cyan-500/10', textColor: 'text-cyan-300', borderColor: 'border-cyan-500/30' },
+    'offer-accepted': { label: 'Offer Accepted', bgColor: 'bg-emerald-500/10', textColor: 'text-emerald-300', borderColor: 'border-emerald-500/30' },
+    'sent-to-onboarding': { label: 'Onboarding', bgColor: 'bg-teal-500/10', textColor: 'text-teal-300', borderColor: 'border-teal-500/30' },
+    'joined': { label: 'Joined', bgColor: 'bg-emerald-600/10', textColor: 'text-emerald-400', borderColor: 'border-emerald-600/30' },
+    'rejected': { label: 'Rejected', bgColor: 'bg-red-500/10', textColor: 'text-red-300', borderColor: 'border-red-500/30' }
+  };
+
+  const status = statusMap[stage] || statusMap['applied'];
+  console.log('   Status result:', status);
+
+  return (
+    <span className={`px-2 py-0.5 text-[10px] rounded-full border ${status.bgColor} ${status.textColor} ${status.borderColor}`}>
+      {status.label}
+    </span>
+  );
+};
 
 const HRCandidatePool = () => {
   const [allEntries, setAllEntries] = useState([]);
@@ -59,6 +101,23 @@ const HRCandidatePool = () => {
     tags: ''
   });
   const [submitting, setSubmitting] = useState(false);
+
+  // Move candidate modal state
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [moveCandidate, setMoveCandidate] = useState(null);
+  const [moveTarget, setMoveTarget] = useState('');
+  const [jobPostings, setJobPostings] = useState([]);
+  const [loadingJobPostings, setLoadingJobPostings] = useState(false);
+  const [selectedJobPosting, setSelectedJobPosting] = useState('');
+  const [interviewDetails, setInterviewDetails] = useState({
+    type: 'Technical',
+    scheduledDate: '',
+    scheduledTime: '',
+    meetingPlatform: 'Google Meet',
+    meetingLink: ''
+  });
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const dropdownRefs = useRef({});
 
   const pageSize = 20;
 
@@ -560,28 +619,172 @@ const HRCandidatePool = () => {
     setSelectedEntry(null);
   };
 
-  const handleStageChange = async (entry, newStage) => {
+  // Load job postings for candidate movement
+  const loadJobPostingsForMove = async () => {
+    console.log('🔄 Loading job postings for move...');
+    setLoadingJobPostings(true);
     try {
-      if (entry.type === 'candidate') {
-        // Update candidate stage
-        await api.put(`/candidates/${entry.id}`, {
-          stage: newStage
-        });
-      } else if (entry.type === 'resume') {
-        // Update resume processing status
-        await api.put(`/resume-pool/${entry.id}`, {
-          processingStatus: newStage === 'shortlisted' ? 'completed' : 'processing'
-        });
-      }
-
-      // Refresh the candidate pool
-      await fetchCandidatePool({ page: page });
-      toast.success(`Candidate moved to ${newStage} stage`);
+      const response = await api.get('/candidates/job-postings-for-move');
+      console.log('✅ Job postings loaded:', response.data);
+      setJobPostings(response.data.jobPostings || []);
     } catch (err) {
-      console.error('Failed to update stage:', err);
-      toast.error('Failed to update candidate stage');
+      console.error('❌ Failed to load job postings:', err);
+      toast.error('Failed to load job postings');
+      setJobPostings([]);
+    } finally {
+      setLoadingJobPostings(false);
     }
   };
+
+  // Open move candidate modal
+  const openMoveModal = async (entry, target) => {
+    console.log('📂 Opening move modal for:', entry.name, 'Target:', target);
+    setMoveCandidate(entry);
+    setMoveTarget(target);
+    setSelectedJobPosting('');
+    setInterviewDetails({
+      type: 'Technical',
+      scheduledDate: '',
+      scheduledTime: '',
+      meetingPlatform: 'Google Meet',
+      meetingLink: ''
+    });
+    
+    // Load job postings if needed
+    if (['applicant', 'shortlisted', 'onboarding', 'interview'].includes(target)) {
+      await loadJobPostingsForMove();
+    }
+    
+    setShowMoveModal(true);
+    setOpenDropdownId(null);
+  };
+
+  // Close move candidate modal
+  const closeMoveModal = () => {
+    setShowMoveModal(false);
+    setMoveCandidate(null);
+    setMoveTarget('');
+    setSelectedJobPosting('');
+    setJobPostings([]);
+  };
+
+  // Handle candidate movement
+  const handleMoveCandidate = async () => {
+    try {
+      if (!moveCandidate || !moveTarget) {
+        toast.error('Invalid move operation');
+        return;
+      }
+
+      // Validate job posting selection if required
+      if (needsJobPosting(moveTarget) && !selectedJobPosting) {
+        toast.error('Please select a job posting');
+        return;
+      }
+
+      // Validate interview details if required
+      if (moveTarget === 'interview') {
+        if (!interviewDetails.scheduledDate || !interviewDetails.scheduledTime) {
+          toast.error('Please provide interview date and time');
+          return;
+        }
+      }
+
+      const payload = {
+        targetSection: moveTarget,
+        jobPostingId: selectedJobPosting || undefined,
+        interviewDetails: moveTarget === 'interview' ? interviewDetails : undefined
+      };
+
+      console.log('🚀 Moving candidate:', payload);
+
+      await api.post(`/candidates/${moveCandidate.id}/move-to-section`, payload);
+      
+      toast.success(`Candidate moved to ${getMoveTargetLabel(moveTarget)} successfully`);
+      closeMoveModal();
+      
+      // Refresh the candidate pool
+      await fetchCandidatePool({ page: page });
+    } catch (err) {
+      console.error('❌ Failed to move candidate:', err);
+      toast.error(err.response?.data?.message || 'Failed to move candidate');
+    }
+  };
+
+  // Check if job posting selection is required
+  const needsJobPosting = (target) => {
+    return ['applicant', 'shortlisted', 'onboarding'].includes(target);
+  };
+
+  // Get label for move target
+  const getMoveTargetLabel = (target) => {
+    const labels = {
+      'applicant': 'Applicant Pool',
+      'shortlisted': 'Shortlisted',
+      'interview': 'Schedule Interview',
+      'offer': 'Extend Offer',
+      'onboarding': 'Onboarding',
+      'contract': 'Contract',
+      'rejected': 'Rejected'
+    };
+    return labels[target] || target;
+  };
+
+  // Get dynamic status label and color for candidate
+  const getCandidateStatus = (entry) => {
+    console.log('🔍 getCandidateStatus called for:', entry.name);
+    console.log('   Entry type:', entry.type);
+    console.log('   Entry stage:', entry.stage);
+    console.log('   Original stage:', entry.original?.stage);
+    console.log('   Is Ex-Employee:', entry.original?.isExEmployee);
+    console.log('   Full entry:', entry);
+
+    if (entry.original?.isExEmployee) {
+      return {
+        label: 'Ex-Employee',
+        bgColor: 'bg-orange-500/10',
+        textColor: 'text-orange-300',
+        borderColor: 'border-orange-500/30'
+      };
+    }
+
+    const stage = entry.original?.stage || entry.stage || 'applied';
+    console.log('   Final stage used:', stage);
+    
+    const statusMap = {
+      'applied': { label: 'Applied', bgColor: 'bg-blue-500/10', textColor: 'text-blue-300', borderColor: 'border-blue-500/30' },
+      'screening': { label: 'Screening', bgColor: 'bg-yellow-500/10', textColor: 'text-yellow-300', borderColor: 'border-yellow-500/30' },
+      'shortlisted': { label: 'Shortlisted', bgColor: 'bg-green-500/10', textColor: 'text-green-300', borderColor: 'border-green-500/30' },
+      'interview-scheduled': { label: 'Interview', bgColor: 'bg-purple-500/10', textColor: 'text-purple-300', borderColor: 'border-purple-500/30' },
+      'interview-completed': { label: 'Interviewed', bgColor: 'bg-purple-500/10', textColor: 'text-purple-300', borderColor: 'border-purple-500/30' },
+      'offer-extended': { label: 'Offer Extended', bgColor: 'bg-cyan-500/10', textColor: 'text-cyan-300', borderColor: 'border-cyan-500/30' },
+      'offer-accepted': { label: 'Offer Accepted', bgColor: 'bg-emerald-500/10', textColor: 'text-emerald-300', borderColor: 'border-emerald-500/30' },
+      'sent-to-onboarding': { label: 'Onboarding', bgColor: 'bg-teal-500/10', textColor: 'text-teal-300', borderColor: 'border-teal-500/30' },
+      'joined': { label: 'Joined', bgColor: 'bg-emerald-600/10', textColor: 'text-emerald-400', borderColor: 'border-emerald-600/30' },
+      'rejected': { label: 'Rejected', bgColor: 'bg-red-500/10', textColor: 'text-red-300', borderColor: 'border-red-500/30' }
+    };
+
+    const result = statusMap[stage] || statusMap['applied'];
+    console.log('   Status result:', result);
+    return result;
+  };
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside all dropdowns
+      const clickedOutside = Object.values(dropdownRefs.current).every(
+        ref => !ref || !ref.contains(event.target)
+      );
+      
+      if (clickedOutside) {
+        setOpenDropdownId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleBulkUploadFileChange = (e) => {
     const file = e.target.files[0];
@@ -888,6 +1091,7 @@ const HRCandidatePool = () => {
                     <th className="px-4 py-3 text-left">Matched Skills</th>
                   </>
                 )}
+                <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Resume/CV</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -895,7 +1099,7 @@ const HRCandidatePool = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={jdSearch.showResults ? 9 : 7} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={jdSearch.showResults ? 10 : 8} className="px-4 py-10 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 className="w-5 h-5 animate-spin text-[#A88BFF]" />
                       <span>Loading candidate pool...</span>
@@ -904,7 +1108,7 @@ const HRCandidatePool = () => {
                 </tr>
               ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={jdSearch.showResults ? 9 : 7} className="px-4 py-10 text-center text-gray-500 text-sm">
+                  <td colSpan={jdSearch.showResults ? 10 : 8} className="px-4 py-10 text-center text-gray-500 text-sm">
                     No candidates found yet. Adjust filters or add resumes manually.
                   </td>
                 </tr>
@@ -921,15 +1125,6 @@ const HRCandidatePool = () => {
                           {entry.isJDMatched && (
                             <span className="px-2 py-0.5 text-[10px] rounded-full bg-green-500/10 text-green-300 border border-green-500/30">
                               JD Match
-                            </span>
-                          )}
-                          {entry.type === 'candidate' && !entry.isJDMatched && (
-                            <span className={`px-2 py-0.5 text-[10px] rounded-full border ${
-                              entry.original?.isExEmployee 
-                                ? 'bg-orange-500/10 text-orange-300 border-orange-500/30' 
-                                : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
-                            }`}>
-                              {entry.original?.isExEmployee ? 'Ex-Employee' : 'Applicant'}
                             </span>
                           )}
                           {entry.type === 'resume' && (
@@ -1019,6 +1214,9 @@ const HRCandidatePool = () => {
                       </>
                     )}
                     <td className="px-4 py-3">
+                      <CandidateStatusBadge entry={entry} />
+                    </td>
+                    <td className="px-4 py-3">
                       {entry.resumeUrl ? (
                         <div className="flex items-center gap-2">
                           <a
@@ -1042,26 +1240,72 @@ const HRCandidatePool = () => {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <select
-                          className="px-2 py-1 bg-[#1E1E2A] border border-gray-700 rounded text-xs text-gray-200 focus:outline-none focus:border-[#A88BFF]"
-                          defaultValue={entry.stage || 'applied'}
-                          onChange={(e) => handleStageChange(entry, e.target.value)}
-                        >
-                          <option value="applied">Applied</option>
-                          <option value="shortlisted">Shortlisted</option>
-                          <option value="interview-scheduled">Interview</option>
-                          <option value="interviewed">Interviewed</option>
-                          <option value="offer-extended">Offer Extended</option>
-                          <option value="offer-accepted">Offer Accepted</option>
-                          <option value="rejected">Rejected</option>
-                          <option value="onboarded">Onboarded</option>
-                        </select>
                         <button
                           onClick={() => openEntryModal(entry)}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-700 text-xs text-gray-200 hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
                         >
                           <FileText className="w-3 h-3" />
+                          View Details
                         </button>
+                        
+                        {entry.type === 'candidate' && (
+                          <div className="relative" ref={el => dropdownRefs.current[entry.id] = el}>
+                            <button
+                              onClick={() => setOpenDropdownId(openDropdownId === entry.id ? null : entry.id)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-700 text-xs text-gray-200 hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
+                            >
+                              <MoreVertical className="w-3 h-3" />
+                            </button>
+                            
+                            {openDropdownId === entry.id && (
+                              <div className="absolute right-0 mt-1 w-48 bg-[#2A2A3A] border border-gray-700 rounded-lg shadow-xl z-50 py-1">
+                                <div className="px-3 py-2 border-b border-gray-700">
+                                  <p className="text-xs font-medium text-gray-400">Move to</p>
+                                </div>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'applicant')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <Briefcase className="w-3 h-3 text-blue-400" />
+                                  Applicant Pool
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'shortlisted')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <CheckCircle className="w-3 h-3 text-green-400" />
+                                  Shortlisted
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'interview')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <Calendar className="w-3 h-3 text-purple-400" />
+                                  Schedule Interview
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'onboarding')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <UserCheck className="w-3 h-3 text-cyan-400" />
+                                  Move to Onboarding
+                                </button>
+                                
+                                <button
+                                  onClick={() => openMoveModal(entry, 'rejected')}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-[#1E1E2A] transition-colors"
+                                >
+                                  <XCircle className="w-3 h-3 text-red-400" />
+                                  Rejected
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1459,6 +1703,53 @@ const HRCandidatePool = () => {
                               <li key={idx}>{item}</li>
                             ))}
                           </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action History Section - Only for candidates */}
+                {selectedEntry.type === 'candidate' && (
+                  <div className="bg-[#1E1E2A] border border-gray-800 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-[#A88BFF]" />
+                      Action History
+                    </h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {selectedEntry.original?.workflowHistory && selectedEntry.original.workflowHistory.length > 0 ? (
+                        selectedEntry.original.workflowHistory
+                          .slice()
+                          .reverse()
+                          .map((action, idx) => (
+                            <div key={idx} className="flex items-start gap-2 p-2 bg-[#11111C] border border-gray-800 rounded-lg">
+                              <div className="w-2 h-2 rounded-full bg-[#A88BFF] mt-1.5 flex-shrink-0"></div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-medium text-white">
+                                    {action.fromStage} → {action.toStage}
+                                  </p>
+                                  <span className="text-[10px] text-gray-500">
+                                    {new Date(action.timestamp).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                {action.reason && (
+                                  <p className="text-[10px] text-gray-400 mt-1">
+                                    {action.reason}
+                                  </p>
+                                )}
+                                {action.skippedStages && action.skippedStages.length > 0 && (
+                                  <p className="text-[10px] text-yellow-400 mt-1">
+                                    Skipped: {action.skippedStages.join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                      ) : (
+                        <div className="text-center py-4">
+                          <Clock className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                          <p className="text-xs text-gray-500">No action history available</p>
                         </div>
                       )}
                     </div>
@@ -1865,6 +2156,181 @@ const HRCandidatePool = () => {
                   Create JD
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move Candidate Modal */}
+      {showMoveModal && moveCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && closeMoveModal()}>
+          <div className="w-full max-w-lg bg-[#2A2A3A] border border-gray-800 rounded-2xl shadow-xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <div>
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <ArrowRight className="w-4 h-4 text-[#A88BFF]" />
+                  Move to {getMoveTargetLabel(moveTarget)}
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  Moving: <span className="text-white">{moveCandidate.name}</span>
+                </p>
+              </div>
+              <button
+                onClick={closeMoveModal}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[60vh]">
+              <div className="bg-[#1E1E2A] border border-gray-700 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="w-4 h-4 text-[#A88BFF]" />
+                  <span className="text-sm font-medium text-white">{moveCandidate.name}</span>
+                </div>
+                <p className="text-xs text-gray-400">{moveCandidate.email}</p>
+                {moveCandidate.original?.appliedFor && (
+                  <span className="text-xs text-gray-400">
+                    for {moveCandidate.original.appliedFor.title}
+                  </span>
+                )}
+              </div>
+
+              {/* Job Posting Selection - for applicant and onboarding */}
+              {needsJobPosting(moveTarget) && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-2">
+                    Select Job Posting <span className="text-red-400">*</span>
+                  </label>
+                  {loadingJobPostings ? (
+                    <div className="flex items-center justify-center py-3 bg-[#1E1E2A] border border-gray-700 rounded-lg">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#A88BFF] mr-2" />
+                      <span className="text-xs text-gray-400">Loading job postings...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedJobPosting}
+                        onChange={(e) => setSelectedJobPosting(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                        disabled={jobPostings.length === 0}
+                      >
+                        <option value="">-- Select a job posting --</option>
+                        {jobPostings.map(jp => (
+                          <option key={jp._id} value={jp._id}>
+                            {jp.title} - {jp.department} ({jp.employmentType})
+                          </option>
+                        ))}
+                      </select>
+                      {jobPostings.length === 0 && !loadingJobPostings && (
+                        <p className="text-xs text-yellow-400 mt-1">
+                          ⚠️ No active job postings found. Please create a job posting first.
+                        </p>
+                      )}
+                      {jobPostings.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {jobPostings.length} job posting{jobPostings.length !== 1 ? 's' : ''} available
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Interview Details - for interview target */}
+              {moveTarget === 'interview' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Interview Type
+                      </label>
+                      <select
+                        value={interviewDetails.type}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, type: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      >
+                        <option value="Technical">Technical</option>
+                        <option value="HR">HR</option>
+                        <option value="Managerial">Managerial</option>
+                        <option value="Cultural Fit">Cultural Fit</option>
+                        <option value="Final Round">Final Round</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Platform
+                      </label>
+                      <select
+                        value={interviewDetails.meetingPlatform}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, meetingPlatform: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      >
+                        <option value="Google Meet">Google Meet</option>
+                        <option value="Microsoft Teams">Microsoft Teams</option>
+                        <option value="Zoom">Zoom</option>
+                        <option value="Phone">Phone</option>
+                        <option value="In-Person">In-Person</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Date <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={interviewDetails.scheduledDate}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Time <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={interviewDetails.scheduledTime}
+                        onChange={(e) => setInterviewDetails(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#A88BFF]"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">
+                      Meeting Link
+                    </label>
+                    <input
+                      type="url"
+                      value={interviewDetails.meetingLink}
+                      onChange={(e) => setInterviewDetails(prev => ({ ...prev, meetingLink: e.target.value }))}
+                      placeholder="https://meet.google.com/..."
+                      className="w-full px-3 py-2 bg-[#1E1E2A] border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#A88BFF]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-800">
+              <button
+                onClick={closeMoveModal}
+                className="px-4 py-2 rounded-lg bg-[#1E1E2A] border border-gray-700 text-sm text-gray-200 font-medium hover:border-[#A88BFF] hover:text-[#A88BFF] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMoveCandidate}
+                className="px-4 py-2 rounded-lg bg-[#A88BFF] text-sm text-white font-medium hover:bg-[#B89CFF] transition-colors flex items-center gap-2"
+              >
+                <ArrowRight className="w-4 h-4" />
+                Move Candidate
+              </button>
             </div>
           </div>
         </div>
