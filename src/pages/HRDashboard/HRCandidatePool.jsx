@@ -1214,7 +1214,13 @@ const HRCandidatePool = () => {
                       </>
                     )}
                     <td className="px-4 py-3">
-                      <CandidateStatusBadge entry={entry} />
+                      {entry.type === 'candidate' ? (
+                        <CandidateStatusBadge entry={entry} />
+                      ) : (
+                        <span className="px-2 py-0.5 text-[10px] rounded-full border bg-purple-500/10 text-purple-300 border-purple-500/30">
+                          Resume
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {entry.resumeUrl ? (
