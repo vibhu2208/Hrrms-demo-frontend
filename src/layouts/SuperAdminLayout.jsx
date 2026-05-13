@@ -27,7 +27,7 @@ import {
 
 const SuperAdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [userPermissions, setUserPermissions] = useState(null);
   const { user, logout } = useAuth();
   const { theme } = useTheme();

@@ -19,9 +19,12 @@ import {
   History,
   FileText as FileContract,
   FolderOpen,
+  CalendarDays,
+  Clock3,
+  Menu,
 } from 'lucide-react';
 
-const Sidebar = ({ isOpen, setIsOpen }) => {
+const Sidebar = ({ isOpen, setIsOpen, collapsed = false, setCollapsed }) => {
   const location = useLocation();
   const { user } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState({});
@@ -119,6 +122,18 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         { label: 'All Contracts', path: '/contracts' },
         { label: 'Create Contract', path: '/contracts/create' }
       ]
+    },
+    {
+      key: 'leave',
+      label: 'Leave',
+      icon: CalendarDays,
+      path: '/leave'
+    },
+    {
+      key: 'timesheet',
+      label: 'Timesheet',
+      icon: Clock3,
+      path: '/timesheet'
     }
   ];
 
@@ -152,6 +167,24 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       label: 'Departments',
       icon: Building,
       path: '/departments'
+    },
+    {
+      key: 'admin-leave',
+      label: 'Leave Admin',
+      icon: CalendarDays,
+      path: '/admin/leave',
+      children: [
+        { label: 'Overview', path: '/admin/leave' },
+        { label: 'Leave Types', path: '/admin/leave/types' },
+        { label: 'Allocations', path: '/admin/leave/allocations' },
+        { label: 'Holidays', path: '/admin/leave/holidays' }
+      ]
+    },
+    {
+      key: 'admin-timesheet',
+      label: 'Timesheet Admin',
+      icon: Clock3,
+      path: '/admin/timesheet'
     }
   ];
 
@@ -185,6 +218,30 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       label: 'Team Reports',
       icon: History,
       path: '/manager/team-reports'
+    },
+    {
+      key: 'manager-leave',
+      label: 'Leave Approvals',
+      icon: CalendarDays,
+      path: '/manager/leave'
+    },
+    {
+      key: 'manager-my-leave',
+      label: 'My Leave',
+      icon: CalendarDays,
+      path: '/leave/apply'
+    },
+    {
+      key: 'manager-timesheet',
+      label: 'Timesheet Queue',
+      icon: Clock3,
+      path: '/manager/timesheet'
+    },
+    {
+      key: 'manager-timesheet-fill',
+      label: 'Fill Team Timesheet',
+      icon: Clock3,
+      path: '/manager/timesheet/fill'
     }
   ];
 
@@ -278,57 +335,109 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen theme-surface border-r theme-border z-50 transition-transform duration-300 overflow-y-auto overflow-x-hidden ${
+        className={`fixed top-0 left-0 h-screen theme-surface border-r theme-border z-50 overflow-y-auto overflow-x-hidden transition-[transform,width] duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 w-64`}
+        } lg:translate-x-0 w-64 ${collapsed ? 'lg:w-16' : 'lg:w-64'}`}
         style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
       >
         {/* Logo */}
-        <div className="sticky top-0 z-10 flex items-center justify-between h-16 px-4 border-b theme-border theme-surface"
-          style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center justify-center w-full py-2">
-            <span className="text-4xl font-black font-sans bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent tracking-wider">
+        <div
+          className="sticky top-0 z-10 flex items-center justify-between h-16 px-2 lg:px-2 border-b theme-border theme-surface gap-1"
+          style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          <div
+            className={`flex flex-1 items-center justify-center py-2 min-w-0 ${
+              collapsed ? 'lg:justify-center' : ''
+            }`}
+          >
+            <span
+              className={`text-4xl font-black font-sans bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent tracking-wider truncate ${
+                collapsed ? 'lg:hidden' : ''
+              }`}
+            >
               HRMS
             </span>
+            <span
+              className={`hidden text-xl font-black font-sans bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent ${
+                collapsed ? 'lg:inline' : ''
+              }`}
+            >
+              H
+            </span>
           </div>
+          {setCollapsed && (
+            <button
+              type="button"
+              onClick={() => setCollapsed(!collapsed)}
+              className="hidden lg:flex shrink-0 p-1.5 rounded-md theme-text-secondary hover:opacity-80"
+              style={{ color: 'var(--color-textSecondary)' }}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <Menu size={18} />
+            </button>
+          )}
           <button
             onClick={() => setIsOpen(false)}
-            className="lg:hidden text-gray-400 hover:text-white"
+            className="lg:hidden text-gray-400 hover:text-white shrink-0"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-3">
+        <nav className={`flex-1 py-4 ${collapsed ? 'lg:px-1.5' : 'px-3'}`}>
           {menuItems.map((item) => (
-            <div key={item.key} className="mb-1">
+            <div key={item.key} className="mb-1 relative group/item">
               {item.children ? (
                 <div>
                   <button
+                    type="button"
                     onClick={() => toggleMenu(item.key)}
-                    className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      collapsed ? 'lg:justify-center lg:px-2' : 'justify-between'
+                    } ${
                       isMenuActive(item)
                         ? 'sidebar-menu-item active'
                         : 'sidebar-menu-item'
                     }`}
+                    title={collapsed ? item.label : undefined}
                   >
-                    <div className="flex items-center space-x-3">
-                      <item.icon size={20} />
-                      <span>{item.label}</span>
+                    <div className={`flex items-center ${collapsed ? 'lg:space-x-0' : 'space-x-3'}`}>
+                      <item.icon size={20} className="shrink-0" />
+                      <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
                     </div>
-                    {expandedMenus[item.key] ? (
-                      <ChevronDown size={16} />
-                    ) : (
-                      <ChevronRight size={16} />
-                    )}
+                    <span className={collapsed ? 'lg:hidden' : ''}>
+                      {expandedMenus[item.key] ? (
+                        <ChevronDown size={16} />
+                      ) : (
+                        <ChevronRight size={16} />
+                      )}
+                    </span>
                   </button>
                   {expandedMenus[item.key] && (
-                    <div className="ml-6 mt-1 space-y-1">
+                    <div
+                      className={`ml-6 mt-1 space-y-1 ${
+                        collapsed
+                          ? 'lg:absolute lg:left-full lg:top-0 lg:ml-2 lg:w-48 lg:rounded-lg lg:p-2 lg:shadow-lg lg:z-[60] lg:border theme-surface theme-border'
+                          : ''
+                      }`}
+                      style={
+                        collapsed
+                          ? {
+                              backgroundColor: 'var(--color-surface)',
+                              borderColor: 'var(--color-border)',
+                            }
+                          : undefined
+                      }
+                    >
                       {item.children.map((child, index) => (
                         <Link
                           key={index}
                           to={child.path}
+                          onClick={() => {
+                            setIsOpen(false);
+                            if (collapsed) toggleMenu(item.key);
+                          }}
                           className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                             isActive(child.path)
                               ? 'bg-blue-600 text-white'
@@ -340,19 +449,37 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                       ))}
                     </div>
                   )}
+                  {collapsed && (
+                    <div className="hidden lg:block pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 pl-2 opacity-0 group-hover/item:opacity-100 transition-opacity z-[55] whitespace-nowrap">
+                      <span className="rounded-md bg-gray-900 text-white text-xs px-2 py-1 shadow-lg">
+                        {item.label}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <Link
-                  to={item.path}
-                  className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive(item.path)
-                    ? 'sidebar-menu-item active'
-                    : 'sidebar-menu-item'}`}
-                  onMouseEnter={(e) => e.currentTarget.classList.add('hover:bg-gray-800', 'hover:text-white')}
-                  onMouseLeave={(e) => e.currentTarget.classList.remove('hover:bg-gray-800', 'hover:text-white')}
-                >
-                  <item.icon size={20} />
-                  <span>{item.label}</span>
-                </Link>
+                <>
+                  <Link
+                    to={item.path}
+                    className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      collapsed ? 'lg:justify-center lg:px-2' : 'space-x-3'
+                    } ${isActive(item.path) ? 'sidebar-menu-item active' : 'sidebar-menu-item'}`}
+                    title={collapsed ? item.label : undefined}
+                    onClick={() => setIsOpen(false)}
+                    onMouseEnter={(e) => e.currentTarget.classList.add('hover:bg-gray-800', 'hover:text-white')}
+                    onMouseLeave={(e) => e.currentTarget.classList.remove('hover:bg-gray-800', 'hover:text-white')}
+                  >
+                    <item.icon size={20} className="shrink-0" />
+                    <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
+                  </Link>
+                  {collapsed && (
+                    <div className="hidden lg:block pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 opacity-0 group-hover/item:opacity-100 transition-opacity z-[55] whitespace-nowrap">
+                      <span className="rounded-md bg-gray-900 text-white text-xs px-2 py-1 shadow-lg">
+                        {item.label}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}

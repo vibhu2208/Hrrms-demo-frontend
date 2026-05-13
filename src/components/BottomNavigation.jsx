@@ -13,13 +13,14 @@ const BottomNavigation = () => {
   const navItems = isManager ? [
     { id: 'home', label: 'Home', icon: Home, path: '/employee/dashboard' },
     { id: 'manager', label: 'Manager', icon: Shield, path: '/employee/manager/home' },
-    { id: 'leave', label: 'Leave', icon: Calendar, path: '/employee/leave/balance' },
+    { id: 'leave', label: 'Leave', icon: Calendar, path: '/leave' },
+    { id: 'attendance', label: 'Time', icon: Clock, path: '/timesheet' },
     { id: 'profile', label: 'Me', icon: User, path: '/employee/profile' },
     { id: 'more', label: 'More', icon: Menu, path: '/employee/team' }
   ] : [
     { id: 'home', label: 'Home', icon: Home, path: '/employee/dashboard' },
-    { id: 'leave', label: 'Leave', icon: Calendar, path: '/employee/leave/balance' },
-    { id: 'attendance', label: 'Time', icon: Clock, path: '/employee/attendance' },
+    { id: 'leave', label: 'Leave', icon: Calendar, path: '/leave' },
+    { id: 'attendance', label: 'Time', icon: Clock, path: '/timesheet' },
     { id: 'profile', label: 'Me', icon: User, path: '/employee/profile' },
     { id: 'more', label: 'More', icon: Menu, path: '/employee/team' }
   ];

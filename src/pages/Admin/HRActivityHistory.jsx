@@ -110,16 +110,7 @@ const HRActivityHistory = () => {
   };
 
   const getActionColor = (action) => {
-    if (action.includes('created') || action.includes('completed') || action.includes('approved') || action.includes('verified') || action.includes('accepted')) {
-      return 'text-green-400 bg-green-500/10 border-green-500/30';
-    }
-    if (action.includes('deleted') || action.includes('rejected') || action.includes('closed') || action.includes('deactivated')) {
-      return 'text-red-400 bg-red-500/10 border-red-500/30';
-    }
-    if (action.includes('updated') || action.includes('changed') || action.includes('scheduled')) {
-      return 'text-blue-400 bg-blue-500/10 border-blue-500/30';
-    }
-    return 'text-purple-400 bg-purple-500/10 border-purple-500/30';
+    return 'text-gray-200 bg-gray-700/40 border-gray-600/60';
   };
 
   const formatActionName = (action) => {
@@ -157,7 +148,7 @@ const HRActivityHistory = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <History className="w-8 h-8 text-[#A88BFF]" />
+            <History className="w-8 h-8 text-gray-200" />
             HR Activity History
           </h1>
           <p className="text-gray-400 mt-1">Track all HR activities and timeline</p>
@@ -190,7 +181,7 @@ const HRActivityHistory = () => {
                 console.error('Test log error:', error);
               }
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2A2A3A] text-white text-sm font-medium hover:bg-[#3A3A4A] border border-gray-700 transition-colors"
           >
             <Activity size={18} />
             <span>Test Log</span>
@@ -201,50 +192,50 @@ const HRActivityHistory = () => {
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 p-6 rounded-xl border border-blue-500/20">
+          <div className="bg-[#2A2A3A] p-6 rounded-xl border border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400 mb-2">Total Activities</p>
                 <p className="text-3xl font-bold text-white">{stats.totalActivities || 0}</p>
               </div>
-              <div className="p-3 bg-blue-500/20 rounded-xl">
-                <Activity className="h-8 w-8 text-blue-400" />
+              <div className="p-3 bg-[#1E1E2A] rounded-xl border border-gray-700">
+                <Activity className="h-8 w-8 text-gray-200" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 p-6 rounded-xl border border-green-500/20">
+          <div className="bg-[#2A2A3A] p-6 rounded-xl border border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400 mb-2">Active HR Users</p>
                 <p className="text-3xl font-bold text-white">{stats.totalHRUsers || 0}</p>
               </div>
-              <div className="p-3 bg-green-500/20 rounded-xl">
-                <Users className="h-8 w-8 text-green-400" />
+              <div className="p-3 bg-[#1E1E2A] rounded-xl border border-gray-700">
+                <Users className="h-8 w-8 text-gray-200" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 p-6 rounded-xl border border-purple-500/20">
+          <div className="bg-[#2A2A3A] p-6 rounded-xl border border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400 mb-2">Action Types</p>
                 <p className="text-3xl font-bold text-white">{stats.activitiesByAction?.length || 0}</p>
               </div>
-              <div className="p-3 bg-purple-500/20 rounded-xl">
-                <TrendingUp className="h-8 w-8 text-purple-400" />
+              <div className="p-3 bg-[#1E1E2A] rounded-xl border border-gray-700">
+                <TrendingUp className="h-8 w-8 text-gray-200" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 p-6 rounded-xl border border-orange-500/20">
+          <div className="bg-[#2A2A3A] p-6 rounded-xl border border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400 mb-2">Top Active HR</p>
                 <p className="text-3xl font-bold text-white">{stats.topActiveHR?.length || 0}</p>
               </div>
-              <div className="p-3 bg-orange-500/20 rounded-xl">
-                <User className="h-8 w-8 text-orange-400" />
+              <div className="p-3 bg-[#1E1E2A] rounded-xl border border-gray-700">
+                <User className="h-8 w-8 text-gray-200" />
               </div>
             </div>
           </div>
@@ -260,7 +251,7 @@ const HRActivityHistory = () => {
               <select
                 value={filters.action}
                 onChange={(e) => handleFilterChange('action', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent transition-all cursor-pointer"
+                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all cursor-pointer"
               >
                 <option value="">All Actions</option>
                 <option value="send_to_onboarding">Send to Onboarding</option>
@@ -280,7 +271,7 @@ const HRActivityHistory = () => {
               <select
                 value={filters.entityType}
                 onChange={(e) => handleFilterChange('entityType', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent transition-all cursor-pointer"
+                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all cursor-pointer"
               >
                 <option value="">All Entities</option>
                 <option value="employee">Employee</option>
@@ -298,7 +289,7 @@ const HRActivityHistory = () => {
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent transition-all"
+                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all"
               />
             </div>
 
@@ -308,7 +299,7 @@ const HRActivityHistory = () => {
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#A88BFF] focus:border-transparent transition-all"
+                className="w-full px-4 py-2.5 bg-[#1E1E2A] border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all"
               />
             </div>
           </div>
@@ -319,7 +310,7 @@ const HRActivityHistory = () => {
       <div className="bg-[#2A2A3A] rounded-xl border border-gray-800 overflow-hidden shadow-xl">
         {loading ? (
           <div className="p-12 text-center">
-            <div className="w-16 h-16 border-4 border-[#A88BFF] border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <div className="w-16 h-16 border-4 border-gray-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
             <p className="mt-4 text-gray-400">Loading activity history...</p>
           </div>
         ) : activities.length === 0 ? (
@@ -384,7 +375,7 @@ const HRActivityHistory = () => {
 
                         {/* HR User Info */}
                         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#A88BFF] to-[#7DB539] flex items-center justify-center">
+                          <div className="h-8 w-8 rounded-full bg-[#1E1E2A] border border-gray-700 flex items-center justify-center">
                             <span className="text-xs font-bold text-white">
                               {activity.hrName?.charAt(0) || activity.hrEmail?.charAt(0) || 'H'}
                             </span>

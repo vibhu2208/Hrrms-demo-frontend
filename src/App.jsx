@@ -76,6 +76,15 @@ import AdminScheduleMeeting from './pages/Admin/ScheduleMeeting';
 import AdminAnnouncements from './pages/Admin/Announcements';
 import AdminTeamReports from './pages/Admin/TeamReports';
 import AdminEmailConfig from './pages/Admin/EmailConfig';
+import EmployeeLeaveDashboard from './modules/leave/pages/EmployeeLeaveDashboard';
+import ManagerLeaveQueue from './modules/leave/pages/ManagerLeaveQueue';
+import AdminLeaveConfig from './modules/leave/pages/AdminLeaveConfig';
+import AdminLeaveTypes from './modules/leave/pages/AdminLeaveTypes';
+import AdminLeaveAllocations from './modules/leave/pages/AdminLeaveAllocations';
+import EmployeeTimesheetPage from './modules/timesheet/pages/EmployeeTimesheetPage';
+import ManagerApprovalQueue from './modules/timesheet/pages/ManagerApprovalQueue';
+import ManagerBulkUpload from './modules/timesheet/pages/ManagerBulkUpload';
+import AdminTimesheetView from './modules/timesheet/pages/AdminTimesheetView';
 
 function App() {
   return (
@@ -181,6 +190,10 @@ function App() {
             <Route path="schedule-meeting" element={<ManagerScheduleMeeting />} />
             <Route path="announcements" element={<ManagerAnnouncements />} />
             <Route path="team-reports" element={<ManagerTeamReports />} />
+            <Route path="leave" element={<ManagerLeaveQueue />} />
+            <Route path="timesheet" element={<ManagerApprovalQueue />} />
+            <Route path="timesheet/upload" element={<ManagerBulkUpload />} />
+            <Route path="timesheet/fill" element={<EmployeeTimesheetPage />} />
             {/* SPC Project Management Routes */}
             <Route 
               path="spc/manager" 
@@ -214,6 +227,57 @@ function App() {
             <Route path="hr/resume-search" element={<ResumeSearch />} />
             <Route path="hr/resume-parser" element={<ResumeParser />} />
             <Route path="hr/document-verification" element={<DocumentVerification />} />
+            <Route path="leave" element={<EmployeeLeaveDashboard />} />
+            <Route path="timesheet" element={<EmployeeTimesheetPage />} />
+          </Route>
+
+          <Route
+            path="/leave/*"
+            element={
+              <ProtectedRoute roles={['employee', 'hr', 'manager', 'admin', 'company_admin']}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<EmployeeLeaveDashboard />} />
+            <Route path="apply" element={<EmployeeLeaveDashboard />} />
+            <Route path="history" element={<EmployeeLeaveDashboard />} />
+          </Route>
+
+          <Route
+            path="/timesheet/*"
+            element={
+              <ProtectedRoute roles={['employee', 'hr', 'manager', 'admin', 'company_admin']}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<EmployeeTimesheetPage />} />
+          </Route>
+
+          <Route
+            path="/admin/leave/*"
+            element={
+              <ProtectedRoute roles={['admin', 'company_admin']}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminLeaveConfig />} />
+            <Route path="types" element={<AdminLeaveTypes />} />
+            <Route path="allocations" element={<AdminLeaveAllocations />} />
+            <Route path="holidays" element={<AdminLeaveConfig />} />
+          </Route>
+
+          <Route
+            path="/admin/timesheet"
+            element={
+              <ProtectedRoute roles={['admin', 'company_admin']}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminTimesheetView />} />
           </Route>
 
           <Route

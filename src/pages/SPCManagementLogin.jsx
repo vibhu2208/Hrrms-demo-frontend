@@ -78,6 +78,8 @@ const SPCManagementLogin = () => {
 
       if (userData?.role === 'hr') {
         navigate('/job-desk');
+      } else if (userData?.role === 'manager') {
+        navigate('/manager/dashboard');
       } else {
         navigate('/dashboard');
       }

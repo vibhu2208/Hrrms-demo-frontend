@@ -12,14 +12,17 @@ import {
   Users,
   Search,
   FileText,
-  ShieldCheck
+  ShieldCheck,
+  Calendar,
+  Clock
 } from 'lucide-react';
 
 const EmployeeDashboardLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Hidden on mobile by default
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const isHR = user?.role === 'hr';
@@ -32,6 +35,8 @@ const EmployeeDashboardLayout = () => {
     { name: 'Resume Parser', href: '/employee/hr/resume-parser', icon: FileText },
     { name: 'Resume Search', href: '/employee/hr/resume-search', icon: Search },
     { name: 'Document Verification', href: '/employee/hr/document-verification', icon: ShieldCheck },
+    { name: 'Leave', href: '/employee/leave', icon: Calendar },
+    { name: 'Timesheet', href: '/employee/timesheet', icon: Clock },
     { name: 'My Profile', href: '/employee/profile', icon: User },
   ];
   const navigation = isHR ? hrNavigation : [];
@@ -49,24 +54,29 @@ const EmployeeDashboardLayout = () => {
     <div className="min-h-screen bg-[#1E1E2A]">
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen transition-transform bg-[#2A2A3A] border-r border-gray-800 ${
+        className={`fixed top-0 left-0 z-40 h-screen transition-all duration-300 bg-[#2A2A3A] border-r border-gray-800 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0`}
-        style={{ width: '260px' }}
+        } md:translate-x-0 w-64 ${sidebarCollapsed ? 'md:w-16' : 'md:w-[260px]'}`}
       >
-        <div className="h-full px-3 py-4 overflow-y-auto">
+        <div className="h-full px-2 py-4 overflow-y-auto md:px-2">
           {/* Logo */}
-          <div className="flex items-center justify-between mb-6 px-3">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#A88BFF] to-[#8B6FE8] rounded-xl flex items-center justify-center">
+          <div className={`flex items-center mb-6 px-1 ${sidebarCollapsed ? 'md:justify-center' : 'justify-between px-3'}`}>
+            <div className={`flex items-center min-w-0 ${sidebarCollapsed ? 'md:justify-center' : 'space-x-3'}`}>
+              <div className="w-10 h-10 shrink-0 bg-gradient-to-br from-[#A88BFF] to-[#8B6FE8] rounded-xl flex items-center justify-center">
                 <span className="text-white font-bold text-lg">H</span>
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-white">
-                  HRMS Portal
-                </h1>
+              <div className={`min-w-0 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
+                <h1 className="text-lg font-bold text-white truncate">HRMS Portal</h1>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="hidden md:flex shrink-0 p-1.5 rounded-lg text-gray-400 hover:bg-[#1E1E2A] hover:text-white"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Navigation */}
@@ -75,27 +85,41 @@ const EmployeeDashboardLayout = () => {
               const Icon = item.icon;
               const active = isActive(item.href);
               return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                    active
-                      ? 'bg-gradient-to-r from-[#A88BFF] to-[#8B6FE8] text-white shadow-lg'
-                      : 'text-gray-400 hover:bg-[#1E1E2A] hover:text-white'
-                  }`}
-                >
-                  <Icon className="w-5 h-5 mr-3" />
-                  {item.name}
-                </Link>
+                <div key={item.name} className="relative group/nav">
+                  <Link
+                    to={item.href}
+                    className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                      sidebarCollapsed ? 'md:justify-center md:px-2' : ''
+                    } ${
+                      active
+                        ? 'bg-gradient-to-r from-[#A88BFF] to-[#8B6FE8] text-white shadow-lg'
+                        : 'text-gray-400 hover:bg-[#1E1E2A] hover:text-white'
+                    }`}
+                    title={sidebarCollapsed ? item.name : undefined}
+                  >
+                    <Icon className={`w-5 h-5 shrink-0 ${sidebarCollapsed ? 'md:mr-0' : 'mr-3'}`} />
+                    <span className={sidebarCollapsed ? 'md:hidden' : ''}>{item.name}</span>
+                  </Link>
+                  {sidebarCollapsed && (
+                    <div className="hidden md:block pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 opacity-0 group-hover/nav:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                      <span className="rounded-md bg-gray-900 text-white text-xs px-2 py-1 shadow-lg">
+                        {item.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
               );
             })}
-
           </nav>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="md:ml-[260px] transition-all duration-300">
+      <div
+        className={`transition-all duration-300 ${
+          sidebarCollapsed ? 'md:ml-16' : 'md:ml-[260px]'
+        }`}
+      >
         {/* Top Navigation */}
         <header className="sticky top-0 z-30 bg-[#2A2A3A] border-b border-gray-800">
           <div className="px-4 sm:px-6 lg:px-8">
@@ -103,10 +127,18 @@ const EmployeeDashboardLayout = () => {
               {/* Left side */}
               <div className="flex items-center">
                 <button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+                      setSidebarCollapsed((c) => !c);
+                    } else {
+                      setSidebarOpen((o) => !o);
+                    }
+                  }}
                   className="p-2 rounded-xl text-gray-400 hover:bg-[#1E1E2A] hover:text-white transition-colors"
+                  title="Menu"
                 >
-                  {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                  {sidebarOpen ? <X className="w-5 h-5 md:hidden" /> : <Menu className="w-5 h-5 md:hidden" />}
+                  <Menu className="w-5 h-5 hidden md:block" />
                 </button>
               </div>
 
