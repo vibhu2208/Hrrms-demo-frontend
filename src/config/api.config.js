@@ -17,6 +17,21 @@ const ENV = {
   STAGING: 'staging'
 };
 
+/**
+ * Backend mounts routes under /api. Accept VITE_API_URL with or without /api suffix.
+ * Relative '/api' stays as-is; absolute URLs get /api appended when missing.
+ */
+const ensureApiBasePath = (base) => {
+  if (!base || base === '/api') {
+    return '/api';
+  }
+  const trimmed = base.replace(/\/+$/, '');
+  if (trimmed.endsWith('/api')) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+};
+
 // Detect current environment
 const getCurrentEnvironment = () => {
   if (import.meta.env.DEV) {
@@ -40,14 +55,14 @@ const getApiBaseUrl = (env) => {
       
     case ENV.STAGING:
       // Staging environment - use env variable or staging default
-      return (import.meta.env.VITE_API_URL || 'https://hrms-backend-staging.onrender.com') + '/api';
-      
+      return ensureApiBasePath(
+        import.meta.env.VITE_API_URL || 'https://hrms-backend-staging.onrender.com'
+      );
+
     case ENV.PRODUCTION:
     default:
-      // Production - use relative path for nginx proxy or env variable
-      // When deployed in Docker with nginx, /api requests are proxied to backend
-      // When deployed separately, set VITE_API_URL to full backend URL
-      return import.meta.env.VITE_API_URL || '/api';
+      // Production - relative /api when unset; otherwise normalize host URL to include /api
+      return ensureApiBasePath(import.meta.env.VITE_API_URL || '');
   }
 };
 

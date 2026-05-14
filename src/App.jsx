@@ -81,6 +81,7 @@ import ManagerLeaveQueue from './modules/leave/pages/ManagerLeaveQueue';
 import AdminLeaveConfig from './modules/leave/pages/AdminLeaveConfig';
 import AdminLeaveTypes from './modules/leave/pages/AdminLeaveTypes';
 import AdminLeaveAllocations from './modules/leave/pages/AdminLeaveAllocations';
+import AdminLeaveHolidays from './modules/leave/pages/AdminLeaveHolidays';
 import EmployeeTimesheetPage from './modules/timesheet/pages/EmployeeTimesheetPage';
 import ManagerApprovalQueue from './modules/timesheet/pages/ManagerApprovalQueue';
 import ManagerBulkUpload from './modules/timesheet/pages/ManagerBulkUpload';
@@ -266,7 +267,7 @@ function App() {
             <Route index element={<AdminLeaveConfig />} />
             <Route path="types" element={<AdminLeaveTypes />} />
             <Route path="allocations" element={<AdminLeaveAllocations />} />
-            <Route path="holidays" element={<AdminLeaveConfig />} />
+            <Route path="holidays" element={<AdminLeaveHolidays />} />
           </Route>
 
           <Route

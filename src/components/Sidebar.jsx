@@ -177,7 +177,7 @@ const Sidebar = ({ isOpen, setIsOpen, collapsed = false, setCollapsed }) => {
         { label: 'Overview', path: '/admin/leave' },
         { label: 'Leave Types', path: '/admin/leave/types' },
         { label: 'Allocations', path: '/admin/leave/allocations' },
-        { label: 'Holidays', path: '/admin/leave/holidays' }
+        { label: 'Holiday master', path: '/admin/leave/holidays' }
       ]
     },
     {

@@ -13,6 +13,19 @@ const getMonday = (date = new Date()) => {
   return d.toISOString().slice(0, 10);
 };
 
+/** Monday YYYY-MM-DD in local time for the timesheet week (matches how grid columns are built). */
+const localMondayKeyFromPeriodStart = (periodStart) => {
+  const d = periodStart instanceof Date ? new Date(periodStart.getTime()) : new Date(periodStart);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = d.getDay();
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
+  const y = monday.getFullYear();
+  const mo = String(monday.getMonth() + 1).padStart(2, '0');
+  const da = String(monday.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+};
+
 const resolveUserId = (user) => {
   if (!user) return '';
   return (
@@ -162,8 +175,13 @@ const EmployeeTimesheetPage = () => {
   const loadWeek = async (employeeId = selectedEmployeeId, week = weekStart) => {
     try {
       const res = await fetchWeekTimesheet({ employeeId, week });
-      setTimesheet(res.data.timesheet);
+      const ts = res.data.timesheet;
+      setTimesheet(ts);
       setEntries(res.data.entries || []);
+      if (ts?.periodStart) {
+        const aligned = localMondayKeyFromPeriodStart(ts.periodStart);
+        if (aligned) setWeekStart(aligned);
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load timesheet');
     }
@@ -274,7 +292,59 @@ const EmployeeTimesheetPage = () => {
     return projectOptions.filter((project) => (project.managerOptions || []).some((manager) => (manager.id || '') === selectedManagerId));
   }, [projectOptions, segregationMode, selectedManagerId]);
 
+  /** True when no work row is editable (submitted / waiting / finalized). False in draft or when correcting sent-back slices. */
+  const timesheetReadOnly = useMemo(() => {
+    if (!timesheet) return true;
+    const st = timesheet.overallStatus || 'draft';
+    if (st === 'draft') return false;
+    if (['locked', 'fully_approved'].includes(st)) return true;
+    const workEntries = (entries || []).filter((e) => (e.entryType || 'work') === 'work');
+    return !workEntries.some(
+      (e) => ['draft', 'sent_back'].includes(e.sliceStatus || 'draft') && e.isEditable !== false
+    );
+  }, [timesheet, entries]);
+
+  const canSubmitForApproval = useMemo(() => {
+    if (!timesheet) return false;
+    const st = timesheet.overallStatus || 'draft';
+    if (['locked', 'fully_approved', 'submitted'].includes(st)) return false;
+    if (st === 'draft') return true;
+    if (st === 'partially_approved') {
+      return (entries || []).some(
+        (e) => (e.entryType || 'work') === 'work' && ['draft', 'sent_back'].includes(e.sliceStatus || '')
+      );
+    }
+    return false;
+  }, [timesheet, entries]);
+
+  const timesheetStatusBanner = useMemo(() => {
+    if (!timesheet) return null;
+    const st = timesheet.overallStatus || 'draft';
+    const workSentBack = (entries || []).some(
+      (e) => (e.entryType || 'work') === 'work' && e.sliceStatus === 'sent_back' && e.isEditable !== false
+    );
+    const lines = [];
+    if (st === 'draft') {
+      lines.push('Draft — edit your entries, save, then submit for approval.');
+    } else if (st === 'submitted') {
+      lines.push('Submitted — your manager is reviewing. Editing is locked until they return it for corrections.');
+    } else if (st === 'partially_approved') {
+      if (workSentBack) {
+        lines.push('Returned for corrections — update the unlocked rows, save, and submit again.');
+      } else {
+        lines.push('Partially approved — editing is locked while managers finish their review.');
+      }
+    } else if (st === 'fully_approved') {
+      lines.push('Fully approved — this week is complete.');
+    } else if (st === 'locked') {
+      lines.push('Locked — this timesheet period is closed.');
+    }
+    const submittedAt = timesheet.submittedAt ? new Date(timesheet.submittedAt).toLocaleString() : null;
+    return { lines, submittedAt, st };
+  }, [timesheet, entries]);
+
   const addRow = () => {
+    if (timesheetReadOnly) return;
     setEntries((prev) => [
       ...prev,
       {
@@ -292,6 +362,7 @@ const EmployeeTimesheetPage = () => {
   };
 
   const addWholeWeekRows = () => {
+    if (timesheetReadOnly) return;
     const start = new Date(weekStart);
     const rows = [];
     for (let i = 0; i < 7; i += 1) {
@@ -313,7 +384,7 @@ const EmployeeTimesheetPage = () => {
   };
 
   const saveEntries = async () => {
-    if (!timesheet?._id) return;
+    if (!timesheet?._id || timesheetReadOnly) return;
     const payloadEntries = entries
       .map((e) => ({
         id: e._id,
@@ -321,11 +392,18 @@ const EmployeeTimesheetPage = () => {
         projectId: e.projectId,
         taskDescription: e.taskDescription,
         hours: Number(e.hours || 0),
+        workedHours: e.workedHours != null ? Number(e.workedHours) : Number(e.hours || 0),
+        payableHours: e.payableHours != null ? Number(e.payableHours) : Number(e.hours || 0),
         entryType: e.entryType || 'work',
         isBillable: e.isBillable !== false
       }))
-      // Keep auto-filled rows and meaningful manual rows only
-      .filter((e) => e.id || e.hours > 0 || e.entryType === 'leave' || e.entryType === 'holiday');
+      .filter(
+        (e) =>
+          e.id ||
+          e.hours > 0 ||
+          (e.payableHours || 0) > 0 ||
+          ['leave', 'holiday', 'week_off'].includes(e.entryType)
+      );
 
     await upsertTimesheetEntries({
       employeeId: selectedEmployeeId,
@@ -336,7 +414,7 @@ const EmployeeTimesheetPage = () => {
   };
 
   const submit = async () => {
-    if (!timesheet?._id) return;
+    if (!timesheet?._id || !canSubmitForApproval) return;
     try {
       // Persist current UI edits first, then submit.
       await saveEntries();
@@ -355,6 +433,27 @@ const EmployeeTimesheetPage = () => {
         {isManager ? 'Team Weekly Timesheet Fill' : 'Weekly Timesheet'}
       </h1>
       {error ? <p className="text-red-400">{error}</p> : null}
+      {timesheetStatusBanner ? (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            timesheetStatusBanner.st === 'draft'
+              ? 'border-slate-600 bg-slate-900/80 text-slate-200'
+              : timesheetStatusBanner.st === 'submitted' || timesheetStatusBanner.st === 'partially_approved'
+                ? 'border-amber-700/80 bg-amber-950/40 text-amber-100'
+                : 'border-emerald-800 bg-emerald-950/30 text-emerald-100'
+          }`}
+        >
+          <p className="font-semibold capitalize">Status: {String(timesheetStatusBanner.st || '').replace(/_/g, ' ')}</p>
+          {timesheetStatusBanner.lines.map((line) => (
+            <p key={line} className="mt-1 text-xs leading-snug text-gray-300">
+              {line}
+            </p>
+          ))}
+          {timesheetStatusBanner.submittedAt && ['submitted', 'partially_approved', 'fully_approved'].includes(timesheetStatusBanner.st) ? (
+            <p className="mt-2 text-[11px] text-gray-400">Last submitted: {timesheetStatusBanner.submittedAt}</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid gap-3 md:grid-cols-4">
         <input
           type="date"
@@ -430,10 +529,20 @@ const EmployeeTimesheetPage = () => {
           >
             Next Week
           </button>
-          <button className="rounded bg-[#475569] px-3 py-2 text-sm text-white" onClick={addRow} type="button">
+          <button
+            className="rounded bg-[#475569] px-3 py-2 text-sm text-white disabled:opacity-40"
+            onClick={addRow}
+            type="button"
+            disabled={timesheetReadOnly}
+          >
             Add Row
           </button>
-          <button className="rounded bg-[#334155] px-3 py-2 text-sm text-white" onClick={addWholeWeekRows} type="button">
+          <button
+            className="rounded bg-[#334155] px-3 py-2 text-sm text-white disabled:opacity-40"
+            onClick={addWholeWeekRows}
+            type="button"
+            disabled={timesheetReadOnly}
+          >
             Fill Full Week
           </button>
         </div>
@@ -452,6 +561,7 @@ const EmployeeTimesheetPage = () => {
           allProjectOptions={projectOptions}
           segregationMode={segregationMode}
           weekStart={weekStart}
+          readOnly={timesheetReadOnly}
         />
       ) : (
         <div className="rounded border border-gray-700 bg-[#2A2A3A] p-4 text-sm text-gray-300">
@@ -459,8 +569,20 @@ const EmployeeTimesheetPage = () => {
         </div>
       )}
       <div className="flex gap-2">
-        <button className="rounded bg-[#8B6FE8] px-4 py-2 text-white" onClick={saveEntries}>Save</button>
-        <button className="rounded bg-green-600 px-4 py-2 text-white" onClick={submit}>
+        <button
+          className="rounded bg-[#8B6FE8] px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={saveEntries}
+          type="button"
+          disabled={timesheetReadOnly}
+        >
+          Save
+        </button>
+        <button
+          className="rounded bg-green-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={submit}
+          type="button"
+          disabled={!canSubmitForApproval}
+        >
           Submit Whole Week
         </button>
       </div>
