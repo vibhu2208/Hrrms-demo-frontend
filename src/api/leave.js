@@ -15,7 +15,10 @@ export const overrideLeaveAllocation = async (id, payload) => (await api.patch(`
 export const applyLeaveRequest = async (payload) => (await api.post('/leave/requests', payload)).data;
 export const fetchLeaveHistory = async () => (await api.get('/leave/requests/history')).data;
 export const withdrawLeaveRequest = async (id) => (await api.patch(`/leave/requests/${id}/withdraw`)).data;
-export const fetchManagerLeaveQueue = async () => (await api.get('/leave/requests/manager/queue')).data;
+export const fetchManagerLeaveQueue = async (params = {}) =>
+  (await api.get('/leave/requests/manager/queue', { params })).data;
+export const fetchManagerTeamLeaveCalendar = async (params = {}) =>
+  (await api.get('/leave/requests/manager/team-calendar', { params })).data;
 export const actionLeaveRequest = async (id, payload) => (await api.patch(`/leave/requests/${id}/action`, payload)).data;
 export const fetchEscalatedLeaves = async () => (await api.get('/leave/requests/admin/escalations')).data;
 export const fetchAdminLeaveOverview = async (params = {}) =>

@@ -4,7 +4,8 @@ export const fetchWeekTimesheet = async (params) => (await api.get('/timesheet/w
 export const upsertTimesheetEntries = async (payload) => (await api.post('/timesheet/entries', payload)).data;
 export const submitTimesheet = async (timesheetId) => (await api.patch(`/timesheet/${timesheetId}/submit`)).data;
 
-export const fetchManagerTimesheetQueue = async () => (await api.get('/timesheet/manager/queue')).data;
+export const fetchManagerTimesheetQueue = async (params) =>
+  (await api.get('/timesheet/manager/queue', { params })).data;
 export const fetchTimesheetDetail = async (timesheetId) => (await api.get(`/timesheet/${timesheetId}/detail`)).data;
 export const approveWholeWeek = async (timesheetId) => (await api.patch(`/timesheet/${timesheetId}/approve-week`)).data;
 export const sendBackParticularDay = async (timesheetId, payload) =>

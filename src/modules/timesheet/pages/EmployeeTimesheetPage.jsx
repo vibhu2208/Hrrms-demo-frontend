@@ -1,29 +1,32 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, CalendarDays, Plus, Rows, Save, Send } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../api/axios';
 import { fetchWeekTimesheet, upsertTimesheetEntries, submitTimesheet } from '../../../api/timesheet';
 import TimesheetGrid from '../components/TimesheetGrid';
+import { surface, TIMESHEET_WEEK_STATUS, resolveWeekStatusKey } from '../timesheetUi';
 
-const getMonday = (date = new Date()) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
+const toLocalDateKey = (dateLike) => {
+  const d = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 };
 
-/** Monday YYYY-MM-DD in local time for the timesheet week (matches how grid columns are built). */
-const localMondayKeyFromPeriodStart = (periodStart) => {
-  const d = periodStart instanceof Date ? new Date(periodStart.getTime()) : new Date(periodStart);
-  if (Number.isNaN(d.getTime())) return '';
+const parseLocalDateKey = (ymd) => {
+  const m = String(ymd || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return new Date(ymd);
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+};
+
+const getMonday = (date = new Date()) => {
+  const d = typeof date === 'string' ? parseLocalDateKey(date) : new Date(date);
   const day = d.getDay();
   const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
-  const y = monday.getFullYear();
-  const mo = String(monday.getMonth() + 1).padStart(2, '0');
-  const da = String(monday.getDate()).padStart(2, '0');
-  return `${y}-${mo}-${da}`;
+  return toLocalDateKey(monday);
 };
 
 const resolveUserId = (user) => {
@@ -45,19 +48,12 @@ const refId = (ref) => {
   return String(ref._id || ref.id || '');
 };
 
-const toMonday = (dateStr) => {
-  const d = new Date(dateStr);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
-};
+const toMonday = (dateStr) => getMonday(dateStr);
 
 const weekRangeLabel = (weekStart) => {
-  const start = new Date(weekStart);
-  const end = new Date(weekStart);
-  end.setDate(start.getDate() + 6);
+  const start = parseLocalDateKey(weekStart);
+  const end = parseLocalDateKey(weekStart);
+  end.setDate(end.getDate() + 6);
   return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
 };
 
@@ -173,15 +169,14 @@ const EmployeeTimesheetPage = () => {
   };
 
   const loadWeek = async (employeeId = selectedEmployeeId, week = weekStart) => {
+    const requestedWeek = getMonday(week);
+    if (!employeeId) return;
     try {
-      const res = await fetchWeekTimesheet({ employeeId, week });
+      const res = await fetchWeekTimesheet({ employeeId, week: requestedWeek });
       const ts = res.data.timesheet;
       setTimesheet(ts);
       setEntries(res.data.entries || []);
-      if (ts?.periodStart) {
-        const aligned = localMondayKeyFromPeriodStart(ts.periodStart);
-        if (aligned) setWeekStart(aligned);
-      }
+      setError('');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load timesheet');
     }
@@ -292,17 +287,25 @@ const EmployeeTimesheetPage = () => {
     return projectOptions.filter((project) => (project.managerOptions || []).some((manager) => (manager.id || '') === selectedManagerId));
   }, [projectOptions, segregationMode, selectedManagerId]);
 
-  /** True when no work row is editable (submitted / waiting / finalized). False in draft or when correcting sent-back slices. */
-  const timesheetReadOnly = useMemo(() => {
-    if (!timesheet) return true;
+  const gridEditMode = useMemo(() => {
+    if (!timesheet) return 'locked';
     const st = timesheet.overallStatus || 'draft';
-    if (st === 'draft') return false;
-    if (['locked', 'fully_approved'].includes(st)) return true;
-    const workEntries = (entries || []).filter((e) => (e.entryType || 'work') === 'work');
-    return !workEntries.some(
-      (e) => ['draft', 'sent_back'].includes(e.sliceStatus || 'draft') && e.isEditable !== false
-    );
+    if (['locked', 'fully_approved', 'submitted'].includes(st)) return 'locked';
+    if (st === 'draft') return 'full';
+    if (st === 'partially_approved') {
+      const hasSentBack = (entries || []).some(
+        (e) =>
+          (e.entryType || 'work') === 'work' &&
+          e.sliceStatus === 'sent_back' &&
+          e.isEditable !== false
+      );
+      return hasSentBack ? 'corrections' : 'locked';
+    }
+    return 'locked';
   }, [timesheet, entries]);
+
+  /** True when no work row is editable (submitted / waiting / finalized). False in draft or when correcting sent-back days. */
+  const timesheetReadOnly = gridEditMode === 'locked';
 
   const canSubmitForApproval = useMemo(() => {
     if (!timesheet) return false;
@@ -317,31 +320,32 @@ const EmployeeTimesheetPage = () => {
     return false;
   }, [timesheet, entries]);
 
-  const timesheetStatusBanner = useMemo(() => {
+  const workSentBack = useMemo(
+    () =>
+      (entries || []).some(
+        (e) => (e.entryType || 'work') === 'work' && e.sliceStatus === 'sent_back' && e.isEditable !== false
+      ),
+    [entries]
+  );
+
+  const statusMeta = useMemo(() => {
     if (!timesheet) return null;
-    const st = timesheet.overallStatus || 'draft';
-    const workSentBack = (entries || []).some(
-      (e) => (e.entryType || 'work') === 'work' && e.sliceStatus === 'sent_back' && e.isEditable !== false
-    );
-    const lines = [];
-    if (st === 'draft') {
-      lines.push('Draft — edit your entries, save, then submit for approval.');
-    } else if (st === 'submitted') {
-      lines.push('Submitted — your manager is reviewing. Editing is locked until they return it for corrections.');
-    } else if (st === 'partially_approved') {
-      if (workSentBack) {
-        lines.push('Returned for corrections — update the unlocked rows, save, and submit again.');
-      } else {
-        lines.push('Partially approved — editing is locked while managers finish their review.');
-      }
-    } else if (st === 'fully_approved') {
-      lines.push('Fully approved — this week is complete.');
-    } else if (st === 'locked') {
-      lines.push('Locked — this timesheet period is closed.');
-    }
-    const submittedAt = timesheet.submittedAt ? new Date(timesheet.submittedAt).toLocaleString() : null;
-    return { lines, submittedAt, st };
-  }, [timesheet, entries]);
+    const key = resolveWeekStatusKey(timesheet.overallStatus, workSentBack);
+    const cfg = TIMESHEET_WEEK_STATUS[key] || TIMESHEET_WEEK_STATUS.draft;
+    return {
+      key,
+      ...cfg,
+      submittedAt: timesheet.submittedAt ? new Date(timesheet.submittedAt).toLocaleString() : null
+    };
+  }, [timesheet, workSentBack]);
+
+  const shiftWeek = (deltaWeeks) => {
+    const d = parseLocalDateKey(weekStart);
+    d.setDate(d.getDate() + deltaWeeks * 7);
+    setWeekStart(getMonday(d));
+  };
+
+  const isCurrentWeek = weekStart === getMonday();
 
   const addRow = () => {
     if (timesheetReadOnly) return;
@@ -363,13 +367,12 @@ const EmployeeTimesheetPage = () => {
 
   const addWholeWeekRows = () => {
     if (timesheetReadOnly) return;
-    const start = new Date(weekStart);
+    const start = parseLocalDateKey(weekStart);
     const rows = [];
     for (let i = 0; i < 7; i += 1) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
       rows.push({
-        entryDate: d.toISOString().slice(0, 10),
+        entryDate: toLocalDateKey(d),
         projectId: '',
         taskDescription: '',
         hours: 0,
@@ -407,7 +410,7 @@ const EmployeeTimesheetPage = () => {
 
     await upsertTimesheetEntries({
       employeeId: selectedEmployeeId,
-      week: timesheet.periodStart,
+      week: weekStart,
       entries: payloadEntries
     });
     await loadWeek(selectedEmployeeId, weekStart);
@@ -426,165 +429,162 @@ const EmployeeTimesheetPage = () => {
     }
   };
 
-  if (initializing && !timesheet) return <div className="text-gray-200">Loading timesheet...</div>;
+  if (initializing && !timesheet) {
+    return (
+      <div className={surface.page}>
+        <div className="card p-8 text-center text-sm theme-text-secondary">Loading timesheet…</div>
+      </div>
+    );
+  }
   return (
-    <div className="w-full space-y-4 rounded-xl border border-gray-900 bg-black p-4">
-      <h1 className="text-2xl font-semibold text-white">
-        {isManager ? 'Team Weekly Timesheet Fill' : 'Weekly Timesheet'}
-      </h1>
-      {error ? <p className="text-red-400">{error}</p> : null}
-      {timesheetStatusBanner ? (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm ${
-            timesheetStatusBanner.st === 'draft'
-              ? 'border-slate-600 bg-slate-900/80 text-slate-200'
-              : timesheetStatusBanner.st === 'submitted' || timesheetStatusBanner.st === 'partially_approved'
-                ? 'border-amber-700/80 bg-amber-950/40 text-amber-100'
-                : 'border-emerald-800 bg-emerald-950/30 text-emerald-100'
-          }`}
-        >
-          <p className="font-semibold capitalize">Status: {String(timesheetStatusBanner.st || '').replace(/_/g, ' ')}</p>
-          {timesheetStatusBanner.lines.map((line) => (
-            <p key={line} className="mt-1 text-xs leading-snug text-gray-300">
-              {line}
-            </p>
-          ))}
-          {timesheetStatusBanner.submittedAt && ['submitted', 'partially_approved', 'fully_approved'].includes(timesheetStatusBanner.st) ? (
-            <p className="mt-2 text-[11px] text-gray-400">Last submitted: {timesheetStatusBanner.submittedAt}</p>
-          ) : null}
+    <div className={surface.page}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold theme-text tracking-tight sm:text-2xl">
+            {isManager ? 'Team weekly timesheet' : 'Weekly timesheet'}
+          </h1>
+          <p className={`${surface.muted} mt-1 max-w-2xl`}>
+            Log project hours by day. Attendance from leave and holidays is applied automatically.
+          </p>
         </div>
+        {statusMeta ? (
+          <div className="flex flex-col items-start gap-1 sm:items-end shrink-0">
+            <span className={`badge ${statusMeta.badge}`}>{statusMeta.label}</span>
+            <p className="text-xs theme-text-secondary max-w-xs text-left sm:text-right">{statusMeta.message}</p>
+            {statusMeta.submittedAt ? (
+              <p className="text-[11px] theme-text-secondary opacity-80">Submitted {statusMeta.submittedAt}</p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {error ? (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">{error}</div>
       ) : null}
-      <div className="grid gap-3 md:grid-cols-4">
-        <input
-          type="date"
-          className="rounded border border-gray-700 bg-[#0f0f0f] p-2 text-white"
-          value={weekStart}
-          onChange={(e) => setWeekStart(toMonday(e.target.value))}
-        />
-        {isManager && (
-          <select
-            className="rounded border border-gray-700 bg-[#0f0f0f] p-2 text-white"
-            value={selectedEmployeeId}
-            onChange={(e) => setSelectedEmployeeId(e.target.value)}
-          >
-            {teamUsers.map((u) => (
-              <option key={u._id || u.id} value={u._id || u.id}>
-                {`${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email}
-              </option>
-            ))}
-          </select>
-        )}
-        <select
-          className="rounded border border-gray-700 bg-[#0f0f0f] p-2 text-white"
-          value={segregationMode}
-          onChange={(e) => {
-            const mode = e.target.value;
-            setSegregationMode(mode);
-            if (mode !== 'manager') {
-              setSelectedManagerId('all');
-            }
-          }}
-        >
-          <option value="project">Segregate by Project</option>
-          <option value="manager">Segregate by Reporting Manager</option>
-        </select>
-        {segregationMode === 'manager' ? (
-          <select
-            className="rounded border border-gray-700 bg-[#0f0f0f] p-2 text-white"
-            value={selectedManagerId}
-            onChange={(e) => setSelectedManagerId(e.target.value)}
-          >
-            <option value="all">All Reporting Managers</option>
-            {reportingManagers.map((manager) => (
-              <option key={manager.id || manager.name} value={manager.id || ''}>
-                {manager.name}
-              </option>
-            ))}
-          </select>
+
+      <div className={surface.card}>
+        <div className={surface.toolbar}>
+          <div className="flex flex-col gap-2 min-w-[200px]">
+            <span className={surface.label}>Week</span>
+            <div className="inline-flex items-center gap-1 rounded-lg border theme-border theme-surface p-0.5">
+              <button type="button" className={`${surface.btnGhost} !border-0 !px-2`} onClick={() => shiftWeek(-1)} aria-label="Previous week">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="flex flex-col items-center px-2 min-w-[140px]">
+                <span className="text-xs font-medium theme-text">{weekRangeLabel(weekStart)}</span>
+                <input
+                  type="date"
+                  className="mt-0.5 w-full bg-transparent text-[11px] theme-text-secondary border-0 p-0 focus:ring-0"
+                  value={weekStart}
+                  onChange={(e) => setWeekStart(toMonday(e.target.value))}
+                  aria-label="Pick week start"
+                />
+              </div>
+              <button type="button" className={`${surface.btnGhost} !border-0 !px-2`} onClick={() => shiftWeek(1)} aria-label="Next week">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <button type="button" className={`${surface.btnGhost} !text-xs !py-1`} onClick={() => setWeekStart(getMonday())} disabled={isCurrentWeek}>
+              <CalendarDays className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
+              Current week
+            </button>
+          </div>
+          <div className="flex flex-wrap items-end gap-3 flex-1">
+            {isManager ? (
+              <div className="min-w-[180px] flex-1">
+                <label className={surface.label}>Employee</label>
+                <select
+                  className={`${surface.select} w-full`}
+                  value={selectedEmployeeId}
+                  onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                >
+                  {teamUsers.map((u) => (
+                    <option key={u._id || u.id} value={u._id || u.id}>
+                      {`${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            <div className="min-w-[160px]">
+              <label className={surface.label}>View by</label>
+              <select
+                className={`${surface.select} w-full`}
+                value={segregationMode}
+                onChange={(e) => {
+                  const mode = e.target.value;
+                  setSegregationMode(mode);
+                  if (mode !== 'manager') setSelectedManagerId('all');
+                }}
+              >
+                <option value="project">Project</option>
+                <option value="manager">Reporting manager</option>
+              </select>
+            </div>
+
+            {segregationMode === 'manager' ? (
+              <div className="min-w-[180px] flex-1">
+                <label className={surface.label}>Manager filter</label>
+                <select
+                  className={`${surface.select} w-full`}
+                  value={selectedManagerId}
+                  onChange={(e) => setSelectedManagerId(e.target.value)}
+                >
+                  <option value="all">All managers</option>
+                  {reportingManagers.map((manager) => (
+                    <option key={manager.id || manager.name} value={manager.id || ''}>
+                      {manager.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-end gap-2 ml-auto">
+              <button type="button" className={surface.btnGhost} onClick={addRow} disabled={timesheetReadOnly}>
+                <Plus className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
+                Add row
+              </button>
+              <button
+                type="button"
+                className={surface.btnGhost}
+                onClick={addWholeWeekRows}
+                disabled={timesheetReadOnly || gridEditMode === 'corrections'}
+              >
+                <Rows className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
+                Fill week
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {timesheet ? (
+          <TimesheetGrid
+            entries={entries}
+            setEntries={setEntries}
+            projects={filteredProjectOptions}
+            allProjectOptions={projectOptions}
+            segregationMode={segregationMode}
+            weekStart={weekStart}
+            readOnly={timesheetReadOnly}
+            editMode={gridEditMode}
+          />
         ) : (
-          <div className="rounded border border-gray-800 bg-[#0f0f0f] p-2 text-sm text-gray-400">
-            Switch to Reporting Manager mode to filter projects manager-wise.
+          <div className={`${surface.section} text-sm theme-text-secondary`}>
+            Timesheet could not be loaded for this user or week. Change the week or employee and try again.
           </div>
         )}
-        <div className="flex gap-2">
-          <button
-            className="rounded bg-[#1f2937] px-3 py-2 text-sm text-white"
-            onClick={() => {
-              const d = new Date(weekStart);
-              d.setDate(d.getDate() - 7);
-              setWeekStart(d.toISOString().slice(0, 10));
-            }}
-            type="button"
-          >
-            Prev Week
-          </button>
-          <button
-            className="rounded bg-[#1f2937] px-3 py-2 text-sm text-white"
-            onClick={() => {
-              const d = new Date(weekStart);
-              d.setDate(d.getDate() + 7);
-              setWeekStart(d.toISOString().slice(0, 10));
-            }}
-            type="button"
-          >
-            Next Week
-          </button>
-          <button
-            className="rounded bg-[#475569] px-3 py-2 text-sm text-white disabled:opacity-40"
-            onClick={addRow}
-            type="button"
-            disabled={timesheetReadOnly}
-          >
-            Add Row
-          </button>
-          <button
-            className="rounded bg-[#334155] px-3 py-2 text-sm text-white disabled:opacity-40"
-            onClick={addWholeWeekRows}
-            type="button"
-            disabled={timesheetReadOnly}
-          >
-            Fill Full Week
-          </button>
-        </div>
-      </div>
-      <p className="text-sm text-gray-300">Week: {weekRangeLabel(weekStart)}</p>
-      <p className="text-sm text-gray-400">
-        Projects and reporting managers are separated for the selected employee. If the employee is in multiple projects,
-        each manager is shown along with each project.
-      </p>
 
-      {timesheet ? (
-        <TimesheetGrid
-          entries={entries}
-          setEntries={setEntries}
-          projects={filteredProjectOptions}
-          allProjectOptions={projectOptions}
-          segregationMode={segregationMode}
-          weekStart={weekStart}
-          readOnly={timesheetReadOnly}
-        />
-      ) : (
-        <div className="rounded border border-gray-700 bg-[#2A2A3A] p-4 text-sm text-gray-300">
-          Timesheet could not be loaded for this user/week. Please change week or user and retry.
+        <div className={`${surface.divider} flex flex-wrap items-center justify-end gap-2 p-4`}>
+          <button type="button" className={surface.btnSecondary} onClick={saveEntries} disabled={timesheetReadOnly}>
+            <Save className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" />
+            Save draft
+          </button>
+          <button type="button" className={surface.btnPrimary} onClick={submit} disabled={!canSubmitForApproval}>
+            <Send className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" />
+            Submit for approval
+          </button>
         </div>
-      )}
-      <div className="flex gap-2">
-        <button
-          className="rounded bg-[#8B6FE8] px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={saveEntries}
-          type="button"
-          disabled={timesheetReadOnly}
-        >
-          Save
-        </button>
-        <button
-          className="rounded bg-green-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={submit}
-          type="button"
-          disabled={!canSubmitForApproval}
-        >
-          Submit Whole Week
-        </button>
       </div>
     </div>
   );
