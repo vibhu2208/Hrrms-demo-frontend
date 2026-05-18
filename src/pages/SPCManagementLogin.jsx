@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, Briefcase, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { config } from '../config/api.config';
+import BrandLogo from '../components/BrandLogo';
 
 const SPC_COMPANY_NAME = 'SPC Management';
 
@@ -27,7 +28,7 @@ const SPCManagementLogin = () => {
         if (response.data.success) {
           const company = response.data.data.find((item) => item.companyName === SPC_COMPANY_NAME);
           if (!company) {
-            toast.error('SPC Management company not found');
+            toast.error('Demo company not found');
             navigate('/login');
             return;
           }
@@ -43,7 +44,7 @@ const SPCManagementLogin = () => {
         }
       } catch (error) {
         console.error('Error fetching SPC company:', error);
-        toast.error('Failed to load SPC company');
+        toast.error('Failed to load demo company');
         navigate('/login');
       } finally {
         setLoadingCompany(false);
@@ -90,15 +91,15 @@ const SPCManagementLogin = () => {
       if (errorMessage.includes('invalid credentials') || errorMessage.includes('password')) {
         toast.error('Invalid email or password. Please check your credentials and try again.');
       } else if (errorMessage.includes('not found in')) {
-        toast.error('User not found in SPC Management. Please select the correct company or contact your administrator.');
+        toast.error('User not found in this demo workspace. Please contact your administrator.');
       } else if (errorMessage.includes('not found') && !errorMessage.includes('company')) {
         toast.error('No account found with this email address. Please contact your administrator.');
       } else if (errorMessage.includes('deactivated') || errorMessage.includes('inactive')) {
         toast.error('Your account has been deactivated. Please contact your administrator.');
       } else if (errorMessage.includes('company not found') || errorMessage.includes('inactive')) {
-        toast.error('SPC Management company not found or inactive. Please contact support.');
+        toast.error('Demo company not found or inactive. Please contact support@gostaff.in.');
       } else if (errorMessage.includes('database') || errorMessage.includes('accessing company')) {
-        toast.error('Error accessing SPC Management database. Please try again or contact support.');
+        toast.error('Error accessing demo workspace. Please try again or contact support@gostaff.in.');
       } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
         toast.error('Network error. Please check your internet connection and try again.');
       } else {
@@ -114,7 +115,7 @@ const SPCManagementLogin = () => {
       <div className="min-h-screen flex items-center justify-center bg-dark-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading SPC Management...</p>
+          <p className="text-gray-400">Loading gostaff.in demo...</p>
         </div>
       </div>
     );
@@ -135,28 +136,13 @@ const SPCManagementLogin = () => {
           Back to login options
         </button>
 
-        <div className="card mb-6">
-          <div className="flex items-center">
-            <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-emerald-500/10 mr-4">
-              <Briefcase size={24} className="text-emerald-500" />
-            </div>
-            <div>
-              <h3 className="text-white font-semibold">{selectedCompany.name}</h3>
-              <p className="text-sm text-gray-400">Code: {selectedCompany.code}</p>
-            </div>
-          </div>
-        </div>
 
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <img
-              src="/logo2.png"
-              alt="Company Logo"
-              className="h-16 w-auto rounded-2xl shadow-md border-2 border-white/10"
-            />
+          <div className="flex justify-center mb-6">
+            <BrandLogo size="lg" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">SPC Management Login</h1>
-          <p className="text-gray-400">Sign in with your SPC credentials</p>
+          <h1 className="text-3xl font-bold text-white mb-2">gostaff.in Demo Login</h1>
+          <p className="text-gray-400">Sign in with your demo credentials</p>
         </div>
 
         <div className="card">
@@ -175,7 +161,7 @@ const SPCManagementLogin = () => {
                   value={formData.email}
                   onChange={handleChange}
                   className="input-field pl-10"
-                  placeholder="you@spc.com"
+                  placeholder="you@company.com"
                   required
                 />
               </div>
