@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react';
-import { ATTENDANCE_STATUS, surface } from '../timesheetUi';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Copy, Trash2 } from 'lucide-react';
+import { attendancePillMeta, formatHours, normalizeRefId, ts } from '../timesheetUi';
 
-/** Days where the attendance strip is full-day non-work — block project hour inputs (half-day leave still allows project time). */
 const PROJECT_HOURS_BLOCKED_STATUSES = ['paid_leave', 'unpaid_leave', 'holiday', 'week_off'];
 
-/** Calendar day in local timezone (matches typical date picker / Monday week UI). */
 const toLocalDateKey = (dateLike) => {
   const d = dateLike instanceof Date ? dateLike : new Date(dateLike);
   if (Number.isNaN(d.getTime())) return '';
@@ -14,7 +13,6 @@ const toLocalDateKey = (dateLike) => {
   return `${y}-${m}-${day}`;
 };
 
-/** Calendar day in UTC (server often stores leave/timesheet at UTC noon). */
 const toUtcDateKey = (dateLike) => {
   const d = dateLike instanceof Date ? dateLike : new Date(dateLike);
   if (Number.isNaN(d.getTime())) return '';
@@ -24,14 +22,12 @@ const toUtcDateKey = (dateLike) => {
   return `${y}-${m}-${day}`;
 };
 
-/** First YYYY-MM-DD segment if `entryDate` is an ISO string (stable calendar day from API). */
 const isoDatePrefixKey = (entryDate) => {
   if (typeof entryDate !== 'string' || entryDate.length < 10) return '';
   const m = entryDate.match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : '';
 };
 
-/** True if this entry falls on the grid column `weekDayKey` (YYYY-MM-DD). */
 const entryMatchesWeekDate = (entry, weekDayKey) => {
   if (!entry?.entryDate || !weekDayKey) return false;
   const raw = entry.entryDate;
@@ -68,18 +64,16 @@ const getWeekDates = (weekStart) => {
 };
 
 const dateLabel = (dateStr) => {
-  const d = new Date(dateStr);
+  const d = new Date(`${dateStr}T12:00:00`);
   return {
     dayName: d.toLocaleDateString(undefined, { weekday: 'short' }),
     dayMonth: d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
   };
 };
 
-/** Column key for an entry: which week day column it belongs to (first match in week). */
 const columnKeyForEntry = (entry, weekDates) =>
   weekDates.find((d) => entryMatchesWeekDate(entry, d)) || '';
 
-/** Leave / holiday / week-off rows produced by the server (autofill or locked system slices). */
 const isSystemAttendanceEntry = (entry) => {
   if (!entry) return false;
   const src = entry.source || '';
@@ -91,10 +85,6 @@ const isSystemAttendanceEntry = (entry) => {
   return false;
 };
 
-/**
- * Priority (highest wins): Holiday → Week off → Paid leave → Unpaid leave → Present (implicit).
- * Higher rank = higher priority.
- */
 const entryAttendanceRank = (entry) => {
   const et = entry.entryType || '';
   const src = entry.source || '';
@@ -119,32 +109,20 @@ const inferAttendanceStatus = (entry) => {
   return 'present';
 };
 
-/**
- * One consolidated state per calendar day for the attendance summary row.
- */
 const buildConsolidatedAttendanceByDay = (allEntries, weekDates) => {
   const weekSet = new Set(weekDates);
   const system = allEntries.filter((e) => isSystemAttendanceEntry(e));
   const work = allEntries.filter((e) => !isSystemAttendanceEntry(e));
-
   const map = {};
   weekDates.forEach((d) => {
-    map[d] = {
-      status: 'present',
-      payable: 0,
-      leaveTypeName: null,
-      workedFromProjects: 0
-    };
+    map[d] = { status: 'present', payable: 0, leaveTypeName: null, workedFromProjects: 0 };
   });
 
   weekDates.forEach((d) => {
     if (!weekSet.has(d)) return;
     const daySys = system.filter((e) => entryMatchesWeekDate(e, d));
     const dayWork = work.filter((e) => entryMatchesWeekDate(e, d));
-
-    const workPayable = dayWork.reduce((s, e) => s + Number(e.payableHours != null ? e.payableHours : e.hours ?? 0), 0);
     const workWorked = dayWork.reduce((s, e) => s + Number(e.workedHours ?? e.hours ?? 0), 0);
-    map[d].workedFromProjects = workWorked;
 
     let winner = null;
     let best = -1;
@@ -166,7 +144,6 @@ const buildConsolidatedAttendanceByDay = (allEntries, weekDates) => {
       const leaveTypeName = typeof lt === 'object' && lt?.name ? lt.name : chosen.leaveTypeName || null;
       map[d] = {
         status: inferAttendanceStatus(chosen),
-        /** System-attributed payable only (matches badge); project hours stay in work rows. */
         payable: Number(chosen.payableHours != null ? chosen.payableHours : 0),
         leaveTypeName:
           leaveTypeName || (chosen.taskDescription && chosen.entryType === 'leave' ? chosen.taskDescription : null),
@@ -175,18 +152,17 @@ const buildConsolidatedAttendanceByDay = (allEntries, weekDates) => {
     } else {
       map[d] = {
         status: 'present',
-        payable: workPayable,
+        payable: dayWork.reduce((s, e) => s + Number(e.payableHours != null ? e.payableHours : e.hours ?? 0), 0),
         leaveTypeName: null,
         workedFromProjects: workWorked
       };
     }
   });
-
   return map;
 };
 
 const rowKeyForEntry = (entry) =>
-  `${entry.projectId || ''}__${entry.managerId || ''}__${entry.taskDescription || ''}__${entry.entryType || 'work'}__${entry.isBillable !== false}`;
+  `${normalizeRefId(entry.projectId)}__${normalizeRefId(entry.managerId)}__${entry.taskDescription || ''}__${entry.entryType || 'work'}__${entry.isBillable !== false}`;
 
 const emptyDay = (overrides = {}) => ({
   hours: 0,
@@ -216,8 +192,8 @@ const buildWorkRowsFromEntries = (entries, weekDates) => {
     if (!rowsMap.has(rowKey)) {
       rowsMap.set(rowKey, {
         rowKey,
-        projectId: entry.projectId || '',
-        managerId: entry.managerId || '',
+        projectId: normalizeRefId(entry.projectId),
+        managerId: normalizeRefId(entry.managerId),
         taskDescription: entry.taskDescription || '',
         entryType: entry.entryType || 'work',
         isBillable: entry.isBillable !== false,
@@ -261,25 +237,28 @@ const buildWorkRowsFromEntries = (entries, weekDates) => {
       days: weekDates.reduce((acc, d) => ({ ...acc, [d]: emptyDay() }), {})
     });
   }
-
   return rows;
 };
 
 const flattenWorkRowsToEntries = (workRows, weekDates, systemEntriesToPreserve, sentBackByDay = {}) => {
   const flat = [];
-  const weekSet = new Set(weekDates);
-
   workRows.forEach((row) => {
+    const projectId = normalizeRefId(row.projectId);
+    const managerId = normalizeRefId(row.managerId);
+    const taskDescription = row.taskDescription || '';
+    let emitted = false;
+
     weekDates.forEach((date) => {
       const day = row.days[date] || emptyDay();
       if ((day.hours || 0) > 0 || day.id) {
+        emitted = true;
         const onSentBackDay = Boolean(sentBackByDay[date]);
         flat.push({
           _id: day.id || undefined,
           entryDate: date,
-          projectId: row.projectId,
-          managerId: row.managerId || '',
-          taskDescription: row.taskDescription,
+          projectId,
+          managerId,
+          taskDescription,
           hours: Number(day.hours || 0),
           workedHours: Number(day.hours || 0),
           payableHours: Number(day.payable != null ? day.payable : day.hours || 0),
@@ -293,26 +272,46 @@ const flattenWorkRowsToEntries = (workRows, weekDates, systemEntriesToPreserve, 
         });
       }
     });
-  });
 
+    // Keep draft row metadata in entries so project/manager can be set before hours are entered.
+    if (!emitted && (projectId || managerId || taskDescription.trim())) {
+      flat.push({
+        entryDate: weekDates[0],
+        projectId,
+        managerId,
+        taskDescription,
+        hours: 0,
+        workedHours: 0,
+        payableHours: 0,
+        entryType: row.entryType || 'work',
+        isBillable: row.isBillable,
+        sliceStatus: row.sliceStatus || 'draft',
+        isEditable: row.isEditable !== false
+      });
+    }
+  });
   systemEntriesToPreserve.forEach((e) => {
     if (weekDates.some((d) => entryMatchesWeekDate(e, d))) flat.push(e);
   });
-
   return flat;
 };
 
-const AttendanceBadge = ({ status, compact }) => {
-  const meta = ATTENDANCE_STATUS[status] || ATTENDANCE_STATUS.present;
-  const size = compact ? 'text-[10px] px-1.5 py-0' : 'text-[11px] px-2 py-0.5';
-  return <span className={`badge ${meta.badge} ${size}`}>{meta.label}</span>;
-};
+const HourInput = ({ value, onChange, disabled, warn, title }) => (
+  <input
+    type="number"
+    min="0"
+    max="24"
+    step="0.5"
+    className={`${ts.hourInput} !h-8 ${warn ? ts.hourInputWarn : ''}`}
+    value={value ?? 0}
+    onChange={onChange}
+    disabled={disabled}
+    title={title}
+    placeholder="0"
+    aria-label="Hours"
+  />
+);
 
-const GRID_COLS = 'grid grid-cols-[240px_repeat(7,minmax(108px,1fr))_140px]';
-const cellBorder = 'border-r theme-border';
-const headerCell = `${cellBorder} p-2.5 text-xs font-medium theme-text-secondary`;
-
-/** `full` = draft week; `corrections` = only manager sent-back days; `locked` = no edits */
 const TimesheetGrid = ({
   entries,
   setEntries,
@@ -325,6 +324,7 @@ const TimesheetGrid = ({
 }) => {
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
   const effectiveEditMode = readOnly ? 'locked' : editMode;
+  const [collapsedGroups, setCollapsedGroups] = useState({});
 
   const sentBackByDay = useMemo(() => {
     const map = {};
@@ -352,8 +352,7 @@ const TimesheetGrid = ({
   const projectHoursBlockedByDay = useMemo(() => {
     const m = {};
     weekDates.forEach((d) => {
-      const st = attendanceByDay[d]?.status || 'present';
-      m[d] = PROJECT_HOURS_BLOCKED_STATUSES.includes(st);
+      m[d] = PROJECT_HOURS_BLOCKED_STATUSES.includes(attendanceByDay[d]?.status || 'present');
     });
     return m;
   }, [weekDates, attendanceByDay]);
@@ -366,12 +365,11 @@ const TimesheetGrid = ({
     return false;
   };
 
-  const rowHasEditableCell = (row) => weekDates.some((d) => isCellEditable(d));
-
   const rows = useMemo(() => buildWorkRowsFromEntries(entries || [], weekDates), [entries, weekDates]);
 
   const projectLookup = allProjectOptions.reduce((acc, project) => {
-    acc[project.id] = project;
+    const id = normalizeRefId(project.id);
+    if (id) acc[id] = project;
     return acc;
   }, {});
 
@@ -395,27 +393,44 @@ const TimesheetGrid = ({
     });
   };
 
+  const copyRowToNextDay = (rowKey, fromDate) => {
+    const idx = weekDates.indexOf(fromDate);
+    if (idx < 0 || idx >= 6) return;
+    const toDate = weekDates[idx + 1];
+    if (!isCellEditable(toDate) || projectHoursBlockedByDay[toDate]) return;
+    updateRow(rowKey, (curr) => {
+      const src = curr.days[fromDate] || emptyDay();
+      return {
+        ...curr,
+        days: {
+          ...curr.days,
+          [toDate]: { ...(curr.days[toDate] || emptyDay()), hours: src.hours, payable: src.payable }
+        }
+      };
+    });
+  };
+
   const groupedWorkRows = rows.reduce((acc, row) => {
-    const project = projectLookup[row.projectId];
-    const projectName = project?.name || 'Unassigned Project';
-    const selectedManager = (project?.managerOptions || []).find((manager) => (manager.id || '') === (row.managerId || ''));
-    const managerName = selectedManager?.name || project?.managerName || 'Unassigned Manager';
+    const project = projectLookup[normalizeRefId(row.projectId)];
+    const projectName = project?.name || 'Unassigned project';
+    const selectedManager = (project?.managerOptions || []).find((m) => (m.id || '') === (row.managerId || ''));
+    const managerName = selectedManager?.name || project?.managerName || 'Unassigned';
     const groupKey = segregationMode === 'manager' ? managerName : projectName;
     if (!acc[groupKey]) acc[groupKey] = [];
     acc[groupKey].push(row);
     return acc;
   }, {});
 
-  const workedWeekTotal = rows.reduce(
-    (sum, row) => sum + weekDates.reduce((s, date) => s + Number(row.days[date]?.hours || 0), 0),
-    0
-  );
-
   const cellPayableTotal = (cell) => {
     if (!cell) return 0;
     if (cell.payable != null && cell.payable !== '') return Number(cell.payable);
     return Number(cell.hours || 0);
   };
+
+  const workedWeekTotal = rows.reduce(
+    (sum, row) => sum + weekDates.reduce((s, date) => s + Number(row.days[date]?.hours || 0), 0),
+    0
+  );
 
   const payableFromWorkRows = rows.reduce(
     (sum, row) => sum + weekDates.reduce((s, date) => s + cellPayableTotal(row.days[date]), 0),
@@ -429,257 +444,288 @@ const TimesheetGrid = ({
 
   const payableWeekTotal = payableFromWorkRows + payableFromSystem;
 
-  const attendanceRowPayableTotal = weekDates.reduce((s, d) => s + Number(attendanceByDay[d]?.payable || 0), 0);
+  const overtimeHours = useMemo(() => {
+    let ot = 0;
+    weekDates.forEach((d) => {
+      const dayWork = rows.reduce((s, row) => s + Number(row.days[d]?.hours || 0), 0);
+      if (dayWork > 8) ot += dayWork - 8;
+    });
+    return Number(ot.toFixed(1));
+  }, [rows, weekDates]);
 
   const sentBackDayList = weekDates.filter((d) => sentBackByDay[d]);
-  const formatSentBackDate = (ymd) => {
-    const d = new Date(`${ymd}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return ymd;
-    return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const groupKeys = Object.keys(groupedWorkRows);
+  const attendanceRowPayableTotal = weekDates.reduce((s, d) => s + Number(attendanceByDay[d]?.payable || 0), 0);
+
+  const toggleGroup = (key) => {
+    setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const isGroupCollapsed = (key) => collapsedGroups[key] === true;
+
+  const renderHourCell = (row, date) => {
+    const cell = row.days[date] || emptyDay();
+    const dayBlocked = projectHoursBlockedByDay[date];
+    const cellEditable = isCellEditable(date);
+    const managerNote = sentBackByDay[date];
+    return (
+      <div key={`${row.rowKey}-${date}`}>
+        <HourInput
+          value={cell.hours ?? 0}
+          warn={Boolean(managerNote)}
+          disabled={!cellEditable || dayBlocked}
+          title={
+            dayBlocked
+              ? 'Leave / holiday / week off — no project hours'
+              : managerNote || (!cellEditable ? 'Locked' : undefined)
+          }
+          onChange={(e) => {
+            if (!cellEditable || dayBlocked) return;
+            const value = Number(e.target.value || 0);
+            const sentBackDefaults = managerNote ? { sliceStatus: 'sent_back', sentBackReason: managerNote } : {};
+            updateRow(row.rowKey, (curr) => ({
+              ...curr,
+              days: {
+                ...curr.days,
+                [date]: {
+                  ...(curr.days[date] || emptyDay(sentBackDefaults)),
+                  ...sentBackDefaults,
+                  hours: value,
+                  payable: value
+                }
+              }
+            }));
+          }}
+        />
+      </div>
+    );
   };
 
   return (
-    <div className="w-full">
+    <div className="space-y-4">
+      {/* Week summary chips */}
+      <div className="flex flex-wrap gap-2">
+        <div className={ts.statChip}>
+          <span className="text-slate-500">Worked</span>
+          <span className="font-bold text-slate-100 tabular-nums">{formatHours(workedWeekTotal)}</span>
+        </div>
+        <div className={ts.statChip}>
+          <span className="text-slate-500">Payable</span>
+          <span className="font-bold text-emerald-300 tabular-nums">{formatHours(payableWeekTotal)}</span>
+        </div>
+        <div className={ts.statChip}>
+          <span className="text-slate-500">Overtime</span>
+          <span className="font-bold text-amber-300 tabular-nums">{formatHours(overtimeHours)}</span>
+        </div>
+        <div className={ts.statChip}>
+          <span className="text-slate-500">Projects</span>
+          <span className="font-bold text-slate-100 tabular-nums">
+            {rows.filter((r) => normalizeRefId(r.projectId)).length}
+          </span>
+        </div>
+      </div>
+
       {sentBackDayList.length > 0 ? (
-        <div className={`${surface.section} border-b theme-border bg-amber-500/5`}>
-          <p className="text-sm font-medium theme-text">Days returned for correction</p>
-          <p className={`${surface.muted} mt-1`}>
-            Only highlighted columns are editable. Update those days, save, then submit again.
-          </p>
-          <ul className="mt-2 flex flex-wrap gap-2">
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3">
+          <p className="text-sm font-medium text-amber-100">Days returned for correction</p>
+          <p className="text-xs text-amber-200/70 mt-0.5">Only highlighted days are editable.</p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
             {sentBackDayList.map((d) => (
               <li
                 key={d}
-                className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5 text-xs theme-text"
+                className="rounded-md bg-amber-500/10 border border-amber-500/25 px-2 py-1 text-[11px] text-amber-100"
               >
-                <span className="font-medium">{formatSentBackDate(d)}</span>
-                <span className="mx-1.5 theme-text-secondary">·</span>
-                <span className="theme-text-secondary">{sentBackByDay[d]}</span>
+                {dateLabel(d).dayName} {dateLabel(d).dayMonth} · {sentBackByDay[d]}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-      <div className={`${surface.section} flex flex-wrap items-center justify-between gap-2 border-b theme-border text-xs`}>
-        <span className="theme-text-secondary">
-          Worked <span className="font-semibold theme-text">{workedWeekTotal}h</span>
-        </span>
-        <span className="theme-text-secondary">
-          Payable <span className="font-semibold theme-text">{payableWeekTotal}h</span>
-        </span>
-      </div>
-
-      <div className="overflow-x-auto">
-        <div className="min-w-[1180px]">
-            <div className={`${GRID_COLS} theme-surface border-b theme-border`}>
-              <div className={headerCell}>Week</div>
-              {weekDates.map((date) => {
-                const label = dateLabel(date);
-                const sentBack = sentBackByDay[date];
-                return (
-                  <div
-                    key={date}
-                    className={`${headerCell} text-center ${sentBack ? 'bg-amber-500/5' : ''}`}
-                  >
-                    <div className="theme-text-secondary">{label.dayName}</div>
-                    <div className="text-sm font-medium theme-text">{label.dayMonth}</div>
-                    {sentBack ? <div className="mt-0.5 text-[10px] text-amber-500/90">Sent back</div> : null}
-                  </div>
-                );
-              })}
-              <div className={`${headerCell} text-center`}>Totals</div>
-            </div>
-
-            {/* Section 1 — consolidated attendance */}
-            <div className={`${GRID_COLS} border-b theme-border`}>
-              <div className={`${cellBorder} p-2`}>
-                <p className="text-xs font-medium theme-text">Attendance</p>
-                <p className={`${surface.muted} mt-0.5`}>System-applied per day</p>
-              </div>
+      <div className={`${ts.elevated} overflow-x-auto`}>
+        <div className="min-w-[920px]">
+          <div className="sticky top-0 z-20 bg-[#161F33]/98 backdrop-blur-md border-b border-white/[0.06] pt-1.5 pb-1">
+            <div className={ts.gridCols}>
+              <p className={`${ts.label} self-end pb-1`}>Week</p>
               {weekDates.map((date) => {
                 const cell = attendanceByDay[date] || { status: 'present', payable: 0, leaveTypeName: null };
-                const st = cell.status || 'present';
+                const label = dateLabel(date);
+                const isToday = date === toLocalDateKey(new Date());
+                const sentBack = sentBackByDay[date];
+                const meta = attendancePillMeta(cell.status);
                 return (
-                  <div key={`att-${date}`} className={`${cellBorder} p-1.5`}>
-                    <div className="flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-md border theme-border theme-surface px-1 py-1.5 text-center">
-                      <AttendanceBadge status={st} compact />
-                      <div className={`text-xs font-medium ${Number(cell.payable) > 0 ? 'theme-text' : 'theme-text-secondary'}`}>
-                        {Number(cell.payable)}h <span className="font-normal opacity-70">pay</span>
-                      </div>
+                  <div
+                    key={`day-${date}`}
+                    className={`flex flex-col gap-0.5 ${sentBack ? 'rounded-md bg-amber-500/10 ring-1 ring-amber-500/20 px-0.5 pt-0.5' : ''}`}
+                  >
+                    <div className="text-center">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 leading-none">
+                        {label.dayName}
+                      </p>
+                      <p
+                        className={`text-xs font-bold tabular-nums mt-0.5 leading-tight ${
+                          isToday ? 'text-[var(--color-primary)]' : 'text-slate-100'
+                        }`}
+                      >
+                        {label.dayMonth}
+                      </p>
+                      {sentBack ? <p className="text-[8px] text-amber-400/90 mt-0.5 leading-none">Sent back</p> : null}
+                    </div>
+                    <div
+                      className={`rounded-md border px-1 py-0.5 text-center min-h-[24px] flex flex-col justify-center ${meta.shell}`}
+                    >
+                      <span className="text-[9px] font-semibold leading-tight truncate">{meta.label}</span>
+                      <span className="text-[10px] font-bold tabular-nums leading-tight">{formatHours(cell.payable)}</span>
                       {cell.leaveTypeName ? (
-                        <span className="line-clamp-2 max-w-full text-[10px] theme-text-secondary">{cell.leaveTypeName}</span>
-                      ) : st === 'present' && cell.workedFromProjects > 0 ? (
-                        <span className={surface.muted}>{cell.workedFromProjects}h worked</span>
+                        <span className="text-[8px] opacity-75 truncate leading-tight">{cell.leaveTypeName}</span>
                       ) : null}
                     </div>
                   </div>
                 );
               })}
-              <div className="flex flex-col items-center justify-center p-2 text-center" title="Attendance row sum">
-                <span className={surface.muted}>Sum</span>
-                <span className="text-sm font-medium theme-text">{attendanceRowPayableTotal}h</span>
+              <div className="text-center self-end pb-1">
+                <p className={ts.label}>Total</p>
+                <p className="text-xs font-bold text-slate-200 tabular-nums mt-1">{formatHours(attendanceRowPayableTotal)}</p>
               </div>
             </div>
           </div>
 
-        {/* Section 2 — project / work entries */}
-        <p className={`${surface.section} ${surface.muted} border-b theme-border`}>
-          Project time — full-day leave, holiday, and week off lock project hours for that day
-        </p>
-        {Object.entries(groupedWorkRows).map(([groupKey, groupItems]) => {
-          const headerLabel =
-            segregationMode === 'manager' ? `Reporting Manager: ${groupKey}` : `Project: ${groupKey}`;
-          return (
-            <div key={groupKey} className="border-b theme-border">
-              <div className={`${surface.section} border-b theme-border text-sm font-medium theme-text`}>{headerLabel}</div>
-              <div className="min-w-[1300px]">
-                <div className={`${GRID_COLS} theme-surface`}>
-                  <div className={headerCell}>Project / task</div>
-                  {weekDates.map((date) => {
-                    const label = dateLabel(date);
-                    const sentBack = sentBackByDay[date];
-                    return (
-                      <div
-                        key={date}
-                        className={`${headerCell} text-center ${sentBack ? 'bg-amber-500/5' : ''}`}
-                      >
-                        <div className="theme-text-secondary text-[10px]">{label.dayName}</div>
-                        <div className="text-xs font-medium theme-text">{label.dayMonth}</div>
-                        {sentBack ? (
-                          <div className="mt-1 text-[10px] text-amber-500/90">Sent back</div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                  <div className={`${headerCell} text-center`}>Totals</div>
-                </div>
+          {groupKeys.length === 0 ? (
+            <div className="p-10 text-center">
+              <p className="text-sm font-medium text-slate-300">No project rows yet</p>
+              <p className="text-xs text-slate-500 mt-1">Use Add row to log time against a project.</p>
+            </div>
+          ) : (
+            groupKeys.map((groupKey) => {
+              const groupItems = groupedWorkRows[groupKey];
+              const collapsed = isGroupCollapsed(groupKey);
+              const groupWorked = groupItems.reduce(
+                (sum, row) => sum + weekDates.reduce((s, d) => s + Number(row.days[d]?.hours || 0), 0),
+                0
+              );
+              const headerPrefix = segregationMode === 'manager' ? 'Manager' : 'Project';
 
-                {groupItems.map((row) => {
-                  const rowWorked = weekDates.reduce((sum, date) => sum + Number(row.days[date]?.hours || 0), 0);
-                  const rowPayable = weekDates.reduce((sum, date) => sum + cellPayableTotal(row.days[date]), 0);
-                  const rowInputsDisabled = !rowHasEditableCell(row);
-                  return (
-                    <div key={row.rowKey} className={`${GRID_COLS} border-t theme-border`}>
-                      <div className={`${cellBorder} p-2`}>
-                        <select
-                          className={`${surface.select} w-full mb-1 !py-1 !text-xs`}
-                          value={row.projectId || ''}
-                          onChange={(e) =>
-                            updateRow(row.rowKey, (curr) => {
-                              const selectedProject = projectLookup[e.target.value];
-                              const defaultManagerId = selectedProject?.managerOptions?.[0]?.id || '';
-                              return { ...curr, projectId: e.target.value, managerId: defaultManagerId };
-                            })
-                          }
-                          disabled={rowInputsDisabled}
-                        >
-                          <option value="">Select project</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className={`${surface.select} w-full mb-1 !py-1 !text-xs`}
-                          value={row.managerId || ''}
-                          onChange={(e) => updateRow(row.rowKey, (curr) => ({ ...curr, managerId: e.target.value }))}
-                          disabled={rowInputsDisabled || !row.projectId}
-                        >
-                          <option value="">{row.projectId ? 'Select manager' : 'Select project first'}</option>
-                          {((projectLookup[row.projectId]?.managerOptions) || []).map((manager) => (
-                            <option key={manager.id || manager.name} value={manager.id || ''}>
-                              {manager.name}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className={`${surface.input} w-full !py-1 !text-xs`}
-                          placeholder="Task"
-                          value={row.taskDescription || ''}
-                          onChange={(e) => updateRow(row.rowKey, (curr) => ({ ...curr, taskDescription: e.target.value }))}
-                          disabled={rowInputsDisabled}
-                        />
-                      </div>
-                      {weekDates.map((date) => {
-                        const cell = row.days[date] || emptyDay();
-                        const dayBlocked = projectHoursBlockedByDay[date];
-                        const cellEditable = isCellEditable(date);
-                        const managerNote = sentBackByDay[date];
-                        return (
-                          <div key={`${row.rowKey}-${date}`} className={`${cellBorder} p-2`}>
-                            <input
-                              className={`${surface.inputCompact} ${
-                                dayBlocked
-                                  ? 'cursor-not-allowed opacity-50'
-                                  : managerNote
-                                    ? '!border-amber-500/60 ring-1 ring-amber-500/30'
-                                    : !cellEditable
-                                      ? 'cursor-not-allowed opacity-50'
-                                      : ''
-                              }`}
-                              type="number"
-                              min="0"
-                              max="24"
-                              step="0.5"
-                              value={cell.hours ?? 0}
-                              onChange={(e) => {
-                                if (!cellEditable || dayBlocked) return;
-                                const value = Number(e.target.value || 0);
-                                const sentBackDefaults = managerNote
-                                  ? { sliceStatus: 'sent_back', sentBackReason: managerNote }
-                                  : {};
-                                updateRow(row.rowKey, (curr) => ({
-                                  ...curr,
-                                  days: {
-                                    ...curr.days,
-                                    [date]: {
-                                      ...(curr.days[date] || emptyDay(sentBackDefaults)),
-                                      ...sentBackDefaults,
-                                      hours: value,
-                                      payable: value
-                                    }
-                                  }
-                                }));
-                              }}
-                              disabled={!cellEditable || dayBlocked}
-                              title={
-                                dayBlocked
-                                  ? 'Full-day leave, holiday, or week off — project hours are not available for this day.'
-                                  : managerNote
-                                    ? `Returned for correction: ${managerNote}`
-                                    : !cellEditable
-                                      ? 'This day is locked while your timesheet is under review.'
-                                      : undefined
-                              }
-                            />
-                          </div>
-                        );
-                      })}
-                      <div className="flex flex-col items-center justify-center gap-1 p-2">
-                        <div className={`text-center ${surface.muted}`}>Worked</div>
-                        <span className="text-sm font-medium theme-text">{rowWorked}h</span>
-                        <div className={`text-center ${surface.muted}`}>Payable</div>
-                        <span className={`text-sm font-medium ${rowPayable > 0 ? 'theme-text' : 'theme-text-secondary'}`}>
-                          {rowPayable}h
-                        </span>
-                        <button
-                          className={`${surface.btnDanger} disabled:opacity-50`}
-                          onClick={() => removeRow(row.rowKey)}
-                          disabled={rowInputsDisabled}
-                          type="button"
-                        >
-                          Remove
-                        </button>
+              return (
+                <div key={groupKey} className="border-t border-white/[0.05]">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-white/[0.02] text-left"
+                    onClick={() => toggleGroup(groupKey)}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {collapsed ? (
+                        <ChevronRight className="h-4 w-4 text-slate-500 shrink-0" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-500">{headerPrefix}</p>
+                        <p className="text-sm font-semibold text-slate-100 truncate">{groupKey}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+                    <span className="text-xs text-slate-400 tabular-nums shrink-0">{formatHours(groupWorked)}</span>
+                  </button>
+
+                  {!collapsed
+                    ? groupItems.map((row) => {
+                        const rowWorked = weekDates.reduce((sum, date) => sum + Number(row.days[date]?.hours || 0), 0);
+                        const rowPayable = weekDates.reduce((sum, date) => sum + cellPayableTotal(row.days[date]), 0);
+                        const rowInputsDisabled = effectiveEditMode === 'locked';
+                        const projectId = normalizeRefId(row.projectId);
+                        const project = projectLookup[projectId];
+
+                        return (
+                          <div
+                            key={row.rowKey}
+                            className={`${ts.gridCols} items-start py-2 px-1 border-b border-white/[0.04] hover:bg-white/[0.015]`}
+                          >
+                            <div className="space-y-1.5 pr-1">
+                              <select
+                                className={`${ts.select} !py-1.5 !text-xs`}
+                                value={projectId}
+                                onChange={(e) => {
+                                  const nextProjectId = normalizeRefId(e.target.value);
+                                  const selectedProject = projectLookup[nextProjectId];
+                                  const defaultManagerId = normalizeRefId(
+                                    selectedProject?.managerOptions?.[0]?.id
+                                  );
+                                  updateRow(row.rowKey, (curr) => ({
+                                    ...curr,
+                                    projectId: nextProjectId,
+                                    managerId: defaultManagerId
+                                  }));
+                                }}
+                                disabled={rowInputsDisabled}
+                              >
+                                <option value="">Project</option>
+                                {projects.map((p) => {
+                                  const id = normalizeRefId(p.id);
+                                  return (
+                                    <option key={id} value={id}>
+                                      {p.label}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <input
+                                className={`${ts.select} !py-1.5 !text-xs`}
+                                placeholder="Task"
+                                value={row.taskDescription || ''}
+                                onChange={(e) =>
+                                  updateRow(row.rowKey, (curr) => ({ ...curr, taskDescription: e.target.value }))
+                                }
+                                disabled={rowInputsDisabled}
+                              />
+                              <div className="flex items-center gap-1">
+                                <select
+                                  className={`${ts.select} !py-1 !text-[11px] flex-1 min-w-0`}
+                                  value={normalizeRefId(row.managerId)}
+                                  onChange={(e) =>
+                                    updateRow(row.rowKey, (curr) => ({
+                                      ...curr,
+                                      managerId: normalizeRefId(e.target.value)
+                                    }))
+                                  }
+                                  disabled={rowInputsDisabled || !projectId}
+                                >
+                                  <option value="">Manager</option>
+                                  {((project?.managerOptions) || []).map((manager) => {
+                                    const mid = normalizeRefId(manager.id);
+                                    return (
+                                      <option key={mid || manager.name} value={mid}>
+                                        {manager.name}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <button
+                                  type="button"
+                                  className="p-1.5 rounded-md text-slate-500 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-30"
+                                  onClick={() => removeRow(row.rowKey)}
+                                  disabled={rowInputsDisabled}
+                                  title="Remove row"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                            {weekDates.map((date) => renderHourCell(row, date))}
+                            <div className="pt-1 text-center">
+                              <p className="text-[10px] text-slate-500">Worked</p>
+                              <p className="text-sm font-bold text-slate-100 tabular-nums">{formatHours(rowWorked)}</p>
+                              <p className="text-[10px] text-slate-500 mt-0.5">{formatHours(rowPayable)} pay</p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    : null}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
+
+
     </div>
   );
 };
